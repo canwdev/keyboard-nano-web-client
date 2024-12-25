@@ -104,27 +104,44 @@ app.post('/device_close', (req, res) => {
 });
 
 // 写入数据
-app.post('/hid_report', (req, res) => {
-  const {report, vendor_id, usage_page} = req.body;
+app.post('/write', async (req, res) => {
+  try {
+    const {buffer, isRead = false} = req.body;
 
-  if (!Array.isArray(report)) {
-    return res.json({message: "report is not list. example: [4, 3]"});
-  }
+    if (!Array.isArray(buffer) || !buffer.length) {
+      return res.status(400).json({message: "buffer is not a valid array"});
+    }
 
-  const vendorId = vendor_id || vendorIdS;
-  const usagePage = usage_page || usagePageS;
+    console.log('<<< write', buffer);
+    await h.write(buffer);
+    console.log('write success');
 
-  console.log(vendorId, usagePage, report);
-  const reportResult = readReport(vendorId, usagePage, report);
+    if (!isRead) {
+      return res.json({message: 'write success'});
+    }
 
-  if (reportResult === 1) {
-    return res.json({message: "write error"});
-  } else if (reportResult === 2) {
-    return res.json({message: "read error"});
-  } else if (reportResult === 3) {
-    return res.json({message: "timeout"});
-  } else {
-    return res.json({message: "ok", report: reportResult});
+    const timeStart = performance.now();
+    while (true) {
+      try {
+        console.log('start read');
+        const d = h.readSync();
+        console.log('read success', d);
+
+        if (d) {
+          return res.json({data: d});
+        }
+      } catch (error) {
+        console.error(error)
+        return res.status(400).json({message: error.message});
+      }
+      if (performance.now() - timeStart > 3000) {
+        return res.status(400).json({message: 'read timeout'});
+      }
+    }
+
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({message: error.message});
   }
 });
 
@@ -135,7 +152,8 @@ function ping(vendorId = vendorIdS, usagePage = usagePageS, pageId = 4) {
   buffer[1] = 0x03; // 读取/写入/复位/测试 0=r 1=w 2=reset 3=test
 
   console.log("------");
-  console.log("<", buffer);
+  console.log("<<< ping", buffer);
+
   let timeStart = performance.now();
 
   h.write(buffer);
@@ -143,7 +161,7 @@ function ping(vendorId = vendorIdS, usagePage = usagePageS, pageId = 4) {
   while (true) {
     let data = h.readSync();
     if (data) {
-      console.log(">", data);
+      console.log(">>> pong", data);
       let timeEnd = performance.now();
       console.log("------");
       return `Pong! ${Math.round(timeEnd - timeStart)}ms`;
