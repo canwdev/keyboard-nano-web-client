@@ -1,9 +1,8 @@
 <script lang="ts" setup>
-
-import {computed, onMounted, ref} from "vue";
-import {keyboardNanoApi} from "../../utils/api.ts";
-import {ActionType, HidDevice, PAGE_ID, UnitID} from "./types.ts";
-import {useSettings} from "./hooks/use-settings.ts";
+import {computed, onMounted, ref} from 'vue'
+import {keyboardNanoApi} from '../../utils/api.ts'
+import {ActionType, HidDevice, PAGE_ID, UnitID} from './types.ts'
+import {useSettings} from './hooks/use-settings.ts'
 
 const vendorId = ref('')
 const usagePage = ref('')
@@ -16,39 +15,33 @@ const connectDevice = async () => {
   })
   await loadSettings()
   await getStatus()
-};
+}
 
 const reloadDevice = async () => {
   await writeData(ActionType.RELOAD)
-};
+}
 
 const resetDevice = async () => {
   await writeData(ActionType.RESET)
   await closeDevice()
 
   setTimeout(() => {
-
     connectDevice()
   }, 1000)
-};
+}
 
 const closeDevice = async () => {
-  await keyboardNanoApi.deviceClose();
+  await keyboardNanoApi.deviceClose()
   await getStatus()
-};
-
+}
 
 const writeDataRaw = async (buffer: any[] = [], isRead = false) => {
   return await keyboardNanoApi.write({
     buffer,
-    isRead
-  });
+    isRead,
+  })
 }
-const writeData = async (
-  action: ActionType,
-  extraData: any[] = [],
-  isRead = false
-) => {
+const writeData = async (action: ActionType, extraData: any[] = [], isRead = false) => {
   let buffer: any[] = []
 
   buffer[0] = PAGE_ID
@@ -58,7 +51,7 @@ const writeData = async (
     buffer = [...buffer, ...extraData]
   }
   return await writeDataRaw(buffer, isRead)
-};
+}
 
 const sendPing = async () => {
   const {message} = await keyboardNanoApi.ping()
@@ -66,30 +59,32 @@ const sendPing = async () => {
     message: message,
     timeout: 5000,
   })
-};
-
+}
 
 const deviceList = ref<HidDevice[]>([])
 
 // 根据 product 字段对设备列表进行分组
 const deviceListGroupByProduct = computed(() => {
-  return deviceList.value.reduce((acc, device) => {
-    const key = device.product;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(device);
-    return acc;
-  }, {} as Record<string, HidDevice[]>);
-});
+  return deviceList.value.reduce(
+    (acc, device) => {
+      const key = device.product
+      if (!acc[key]) {
+        acc[key] = []
+      }
+      acc[key].push(device)
+      return acc
+    },
+    {} as Record<string, HidDevice[]>,
+  )
+})
 
 const getStatus = async () => {
-  const res = await keyboardNanoApi.getStatus();
+  const res = await keyboardNanoApi.getStatus()
 
-  isConnected.value = res.isConnected;
-  vendorId.value = res.vendorId;
-  usagePage.value = res.usagePage;
-  deviceList.value = res.devices;
+  isConnected.value = res.isConnected
+  vendorId.value = res.vendorId
+  usagePage.value = res.usagePage
+  deviceList.value = res.devices
 }
 
 onMounted(async () => {
@@ -109,11 +104,7 @@ const getRGBHex = (value) => {
     b: parseInt(value.slice(5, 7), 16),
   }
 }
-const colorList = ref([
-  '#ff0000',
-  '#00ff00',
-  '#0000ff',
-])
+const colorList = ref(['#ff0000', '#00ff00', '#0000ff'])
 const testColor = async () => {
   const data: any[] = [UnitID.LED, 0]
   // data[4] = 0x00  // 1-B
@@ -142,37 +133,34 @@ const testColor = async () => {
   await writeData(ActionType.COMMAND, data)
 }
 
-const {
-  settingsForm,
-  keyboardModes,
-  ledModes,
-  ledEffectModes,
-  loadSettings,
-  saveSettings,
-} = useSettings({writeData, writeDataRaw})
-
+const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, saveSettings} =
+  useSettings({writeData, writeDataRaw})
 </script>
 
 <template>
   <div class="keyboard-nano-client">
-
     <fieldset>
-      <legend>设备信息 <a href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md"
-                          target="_blank">(?)</a></legend>
+      <legend>
+        设备信息
+        <a
+          href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md"
+          target="_blank"
+          >(?)</a
+        >
+      </legend>
 
       <div class="flex-cols">
         <div class="flex-rows">
           <label>
             vendorId
-            <input class="themed-input" :disabled="isConnected" type="text" v-model="vendorId">
+            <input class="themed-input" :disabled="isConnected" type="text" v-model="vendorId" />
           </label>
           <label>
             usagePage
-            <input class="themed-input" :disabled="isConnected" type="text" v-model="usagePage">
+            <input class="themed-input" :disabled="isConnected" type="text" v-model="usagePage" />
           </label>
         </div>
-        <div class="flex-rows" style="justify-content: flex-end;">
-
+        <div class="flex-rows" style="justify-content: flex-end">
           <button class="themed-button" @click="getStatus">刷新信息</button>
           <template v-if="!isConnected">
             <button class="themed-button" @click="connectDevice">连接设备</button>
@@ -202,19 +190,15 @@ const {
 
         <div class="flex-cols">
           <div class="flex-rows">
-            <button class="themed-button" @click="loadSettings">
-              读取设置
-            </button>
-            <button class="themed-button" @click="saveSettings">
-              保存设置
-            </button>
+            <button class="themed-button" @click="loadSettings">读取设置</button>
+            <button class="themed-button" @click="saveSettings">保存设置</button>
           </div>
 
           <fieldset>
             <legend>预设模式</legend>
             <div class="flex-rows">
               <label v-for="(item, index) in keyboardModes" :key="index">
-                <input type="radio" :value="index" v-model="settingsForm.keyboardMode">
+                <input type="radio" :value="index" v-model="settingsForm.keyboardMode" />
                 {{ item }}
               </label>
             </div>
@@ -222,8 +206,8 @@ const {
 
           <fieldset>
             <legend>功能</legend>
-            <div>按键扫描间隔: {{ settingsForm.keyboardScanSP }}</div>
-            <div>长按识别间隔: {{ settingsForm.keyboardLP }}</div>
+            <div>按键扫描间隔: <input type="number" v-model="settingsForm.keyboardScanSP" /></div>
+            <div>长按识别间隔: <input type="number" v-model="settingsForm.keyboardLP" /></div>
             <div>屏幕分辨率: {{ settingsForm.resolutionX }} x {{ settingsForm.resolutionY }}</div>
           </fieldset>
 
@@ -234,13 +218,17 @@ const {
               <label>
                 灯光组：
                 <select v-model="settingsForm.ledMode">
-                  <option v-for="(item, index) in ledModes" :value="index" :key="index">{{ item }}</option>
+                  <option v-for="(item, index) in ledModes" :value="index" :key="index">
+                    {{ item }}
+                  </option>
                 </select>
               </label>
               <label>
                 灯效：
                 <select v-model="settingsForm.ledEffectMode">
-                  <option v-for="(item, index) in ledEffectModes" :value="index" :key="index">{{ item }}</option>
+                  <option v-for="(item, index) in ledEffectModes" :value="index" :key="index">
+                    {{ item }}
+                  </option>
                 </select>
               </label>
             </div>
@@ -255,37 +243,35 @@ const {
           仅用于测试LED功能，设置不会保存，点击[重载配置]还原。
 
           <div class="flex-rows">
-            <input v-for="(item, index) in colorList"
-                   v-model="colorList[index]"
-                   :key="index" type="color">
+            <input
+              v-for="(item, index) in colorList"
+              v-model="colorList[index]"
+              :key="index"
+              type="color"
+            />
           </div>
           <div class="flex-rows">
-            <button class="themed-button" @click="testColor">
-              测试
-            </button>
+            <button class="themed-button" @click="testColor">测试</button>
           </div>
         </div>
       </fieldset>
-
     </template>
-
 
     <fieldset>
       <legend>HID Devices</legend>
       <div class="device-list">
         <details v-for="(item, key) of deviceListGroupByProduct" :key="key">
-          <summary>{{ key }}
-          </summary>
+          <summary>{{ key }}</summary>
           <ul
-            :class="{active: v.vendorId===Number(vendorId) && v.usagePage === Number(usagePage)}"
-            v-for="v in item" :key="v.path">
+            :class="{active: v.vendorId === Number(vendorId) && v.usagePage === Number(usagePage)}"
+            v-for="v in item"
+            :key="v.path"
+          >
             <li>{{ v }}</li>
           </ul>
         </details>
       </div>
     </fieldset>
-
-
   </div>
 </template>
 

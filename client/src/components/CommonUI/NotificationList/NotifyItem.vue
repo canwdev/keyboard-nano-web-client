@@ -1,7 +1,7 @@
 <script lang="ts" setup="">
-import {INotification} from '@/components/NotificationList/notification-list'
-import moment from 'moment/moment'
 import {onMounted, ref, toRefs} from 'vue'
+import {formatDate} from '@vueuse/core'
+import {INotification} from '@/components/CommonUI/NotificationList/notification-list.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -12,7 +12,7 @@ const props = withDefaults(
 const emit = defineEmits(['remove'])
 const {item} = toRefs(props)
 const formatTime = (t: number) => {
-  return moment(t).format('YYYY-MM-DD HH:mm:ss')
+  return formatDate(new Date(t), 'YYYY-MM-DD HH:mm:ss')
 }
 
 const countdownMax = ref(0)
