@@ -145,7 +145,7 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
         <a
           href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md"
           target="_blank"
-          >(?)</a
+          >(帮助)</a
         >
       </legend>
 
@@ -189,11 +189,6 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
         <legend>设置</legend>
 
         <div class="flex-cols">
-          <div class="flex-rows">
-            <button class="themed-button" @click="loadSettings">读取设置</button>
-            <button class="themed-button" @click="saveSettings">保存设置</button>
-          </div>
-
           <fieldset>
             <legend>预设模式</legend>
             <div class="flex-rows">
@@ -233,6 +228,11 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
               </label>
             </div>
           </fieldset>
+
+          <div class="flex-rows">
+            <button class="themed-button" @click="loadSettings">读取设置</button>
+            <button class="themed-button" @click="saveSettings">保存设置</button>
+          </div>
         </div>
       </fieldset>
 

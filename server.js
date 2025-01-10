@@ -120,23 +120,18 @@ app.post('/write', async (req, res) => {
       return res.json({message: 'write success'});
     }
 
-    const timeStart = performance.now();
-    while (true) {
-      try {
-        console.log('start read');
-        const d = h.readSync();
-        console.log('read success', d);
 
-        if (d) {
-          return res.json({data: d});
-        }
-      } catch (error) {
-        console.error(error)
-        return res.status(400).json({message: error.message});
+    try {
+      console.log('start read');
+      const d = h.readTimeout(3000);
+      console.log('read success', d);
+
+      if (d) {
+        return res.json({data: d});
       }
-      if (performance.now() - timeStart > 3000) {
-        return res.status(400).json({message: 'read timeout'});
-      }
+    } catch (error) {
+      console.error(error)
+      return res.status(400).json({message: error.message});
     }
 
   } catch (error) {
@@ -158,15 +153,12 @@ function ping(vendorId = vendorIdS, usagePage = usagePageS, pageId = 4) {
 
   h.write(buffer);
 
-  while (true) {
-    let data = h.readSync();
-    if (data) {
-      console.log(">>> pong", data);
-      let timeEnd = performance.now();
-      console.log("------");
-      return `Pong! ${Math.round(timeEnd - timeStart)}ms`;
-    }
-
+  let data = h.readTimeout(3000);
+  if (data) {
+    console.log(">>> pong", data);
+    let timeEnd = performance.now();
+    console.log("------");
+    return `Pong! ${Math.round(timeEnd - timeStart)}ms`;
   }
 }
 
