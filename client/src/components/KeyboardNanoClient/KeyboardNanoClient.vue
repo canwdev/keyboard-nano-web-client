@@ -140,14 +140,7 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
 <template>
   <div class="keyboard-nano-client">
     <fieldset>
-      <legend>
-        设备信息
-        <a
-          href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md"
-          target="_blank"
-          >(帮助)</a
-        >
-      </legend>
+      <legend>设备信息</legend>
 
       <div class="flex-cols">
         <div class="flex-rows">
@@ -160,12 +153,25 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
             <input class="themed-input" :disabled="isConnected" type="text" v-model="usagePage" />
           </label>
         </div>
+
+        <div class="flex-rows">
+          <a
+            href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md"
+            target="_blank"
+          >
+            通信协议
+          </a>
+
+          <a href="https://github.com/canwdev/keyboard-nano-web-client" target="_blank">Github</a>
+        </div>
+
         <div class="flex-rows" style="justify-content: flex-end">
           <button class="themed-button" @click="getStatus">刷新信息</button>
           <template v-if="!isConnected">
             <button class="themed-button" @click="connectDevice">连接设备</button>
           </template>
           <template v-else>
+            <button class="themed-button" @click="sendPing">Ping</button>
             <button class="themed-button" @click="reloadDevice">重载配置</button>
             <button class="themed-button" @click="resetDevice">复位设备</button>
             <button class="themed-button" @click="closeDevice">关闭连接</button>
@@ -175,16 +181,6 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
     </fieldset>
 
     <template v-if="isConnected">
-      <fieldset>
-        <legend>测试</legend>
-
-        <div class="flex-cols">
-          <div class="flex-rows">
-            <button class="themed-button" @click="sendPing">Ping</button>
-          </div>
-        </div>
-      </fieldset>
-
       <fieldset>
         <legend>设置</legend>
 
