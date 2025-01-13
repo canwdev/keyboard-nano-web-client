@@ -3,10 +3,26 @@ import {computed, onMounted, ref} from 'vue'
 import {keyboardNanoApi} from '../../utils/api.ts'
 import {ActionType, HidDevice, PAGE_ID, UnitID} from './types.ts'
 import {useSettings} from './hooks/use-settings.ts'
+import TabLayout from '../CommonUI/TabLayout.vue'
+import {useStorage} from '@vueuse/core'
+import {mainJson} from './data/index.ts'
 
 const vendorId = ref('')
 const usagePage = ref('')
 const isConnected = ref(false)
+
+enum TabType {
+  SETTINGS = 0,
+  KEYBOARD = 1,
+  LED = 2,
+}
+
+const activeTab = useStorage('keyboard_nano_client_active_tab', 0)
+const tabOptions = [
+  {label: '设置', value: TabType.SETTINGS},
+  {label: '按键', value: TabType.KEYBOARD},
+  {label: 'LED', value: TabType.LED},
+]
 
 const connectDevice = async () => {
   await keyboardNanoApi.deviceInit({
@@ -79,7 +95,7 @@ const deviceListGroupByProduct = computed(() => {
 })
 
 const getStatus = async () => {
-  const res = await keyboardNanoApi.getStatus()
+  const res = (await keyboardNanoApi.getStatus()) as any
 
   isConnected.value = res.isConnected
   vendorId.value = res.vendorId
@@ -133,8 +149,43 @@ const testColor = async () => {
   await writeData(ActionType.COMMAND, data)
 }
 
+const lightKey = async (index: number) => {
+  const data: any[] = [UnitID.LED, 0]
+
+  keyboardList.value.forEach((item, idx) => {
+    if (idx === index) {
+      const {r, g, b} = getRGBHex('#FFFFFF')
+
+      // B
+      data.push(b)
+      // R
+      data.push(r)
+      // G
+      data.push(g)
+    } else {
+      // B
+      data.push(0)
+      // R
+      data.push(0)
+      // G
+      data.push(0)
+    }
+  })
+
+  await writeData(ActionType.COMMAND, data)
+}
+
 const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, saveSettings} =
   useSettings({writeData, writeDataRaw})
+
+const keyboardList = computed(() => {
+  return [{id: 0}, {id: 1}, {id: 2}].map((item) => {
+    return {
+      ...item,
+      keyFunc: 0,
+    }
+  })
+})
 </script>
 
 <template>
@@ -168,40 +219,71 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
         <div class="flex-rows" style="justify-content: flex-end">
           <button class="themed-button" @click="getStatus">刷新信息</button>
           <template v-if="!isConnected">
-            <button class="themed-button" @click="connectDevice">连接设备</button>
+            <button class="themed-button green" @click="connectDevice">连接设备</button>
           </template>
           <template v-else>
             <button class="themed-button" @click="sendPing">Ping</button>
-            <button class="themed-button" @click="reloadDevice">重载配置</button>
-            <button class="themed-button" @click="resetDevice">复位设备</button>
-            <button class="themed-button" @click="closeDevice">关闭连接</button>
+            <button class="themed-button yellow" @click="reloadDevice">重载配置</button>
+            <button class="themed-button yellow" @click="resetDevice">复位设备</button>
+            <button class="themed-button red" @click="closeDevice">关闭连接</button>
           </template>
         </div>
       </div>
     </fieldset>
 
     <template v-if="isConnected">
-      <fieldset>
-        <legend>设置</legend>
+      <TabLayout v-model="activeTab" :options="tabOptions" horizontal>
+        <template #sidebar>
+          <div style="justify-content: flex-end; padding: 0 4px; gap: 4px" class="flex-rows">
+            <button class="themed-button" @click="loadSettings">读取设置</button>
+            <button class="themed-button blue" @click="saveSettings">保存设置</button>
+          </div>
+        </template>
 
-        <div class="flex-cols">
-          <fieldset>
-            <legend>预设模式</legend>
-            <div class="flex-rows">
-              <label v-for="(item, index) in keyboardModes" :key="index">
-                <input type="radio" :value="index" v-model="settingsForm.keyboardMode" />
-                {{ item }}
-              </label>
+        <div v-if="activeTab === TabType.SETTINGS">
+          <div class="flex-cols">
+            <fieldset>
+              <legend>预设模式</legend>
+              <div class="flex-rows preset-mode-list">
+                <label v-for="(item, index) in keyboardModes" :key="index">
+                  <input type="radio" :value="index" v-model="settingsForm.keyboardMode" />
+                  {{ item }}
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>功能</legend>
+              <div>按键扫描间隔: <input type="number" v-model="settingsForm.keyboardScanSP" /></div>
+              <div>长按识别间隔: <input type="number" v-model="settingsForm.keyboardLP" /></div>
+              <div>屏幕分辨率: {{ settingsForm.resolutionX }} x {{ settingsForm.resolutionY }}</div>
+            </fieldset>
+          </div>
+        </div>
+
+        <div v-if="activeTab === TabType.KEYBOARD">
+          <div class="flex-rows keyboard-list">
+            <div class="keyboard-item" v-for="item in keyboardList" :key="item.id">
+              <button class="themed-button btn-keyboard" @click="lightKey(item.id)">
+                点亮 {{ item.id }} 键
+              </button>
+
+              <div class="flex-rows">
+                <select v-model="item.keyFunc">
+                  <option
+                    v-for="(func, index) in mainJson.key_func_list"
+                    :value="index"
+                    :key="index"
+                  >
+                    {{ func }}
+                  </option>
+                </select>
+              </div>
             </div>
-          </fieldset>
+          </div>
+        </div>
 
-          <fieldset>
-            <legend>功能</legend>
-            <div>按键扫描间隔: <input type="number" v-model="settingsForm.keyboardScanSP" /></div>
-            <div>长按识别间隔: <input type="number" v-model="settingsForm.keyboardLP" /></div>
-            <div>屏幕分辨率: {{ settingsForm.resolutionX }} x {{ settingsForm.resolutionY }}</div>
-          </fieldset>
-
+        <div v-if="activeTab === TabType.LED">
           <fieldset>
             <legend>LED设置</legend>
 
@@ -225,32 +307,27 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
             </div>
           </fieldset>
 
-          <div class="flex-rows">
-            <button class="themed-button" @click="loadSettings">读取设置</button>
-            <button class="themed-button" @click="saveSettings">保存设置</button>
-          </div>
+          <fieldset>
+            <legend>LED 测试</legend>
+
+            <div class="flex-cols">
+              仅用于测试LED功能，设置不会保存，点击[重载配置]还原。
+
+              <div class="flex-rows">
+                <input
+                  v-for="(item, index) in colorList"
+                  v-model="colorList[index]"
+                  :key="index"
+                  type="color"
+                />
+              </div>
+              <div class="flex-rows">
+                <button class="themed-button" @click="testColor">测试</button>
+              </div>
+            </div>
+          </fieldset>
         </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>LED 测试</legend>
-
-        <div class="flex-cols">
-          仅用于测试LED功能，设置不会保存，点击[重载配置]还原。
-
-          <div class="flex-rows">
-            <input
-              v-for="(item, index) in colorList"
-              v-model="colorList[index]"
-              :key="index"
-              type="color"
-            />
-          </div>
-          <div class="flex-rows">
-            <button class="themed-button" @click="testColor">测试</button>
-          </div>
-        </div>
-      </fieldset>
+      </TabLayout>
     </template>
 
     <fieldset>
@@ -275,6 +352,43 @@ const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, save
 .keyboard-nano-client {
   max-width: 600px;
   margin: 0 auto;
+
+  .mc-vertical-tab-layout {
+    margin-top: 16px;
+    margin-bottom: 16px;
+  }
+
+  .preset-mode-list {
+    display: grid;
+    grid-template-rows: repeat(5, 1fr);
+    /* 定义 5 行 */
+    grid-template-columns: auto;
+    /* 列宽度自动调整 */
+    grid-auto-flow: column;
+    /* 项目按列排列，即纵向排列 */
+    gap: 4px;
+  }
+
+  .keyboard-list {
+    .keyboard-item {
+      flex: 1;
+      padding: 4px 8px;
+      border: 1px solid #9c9c9c33;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+      gap: 10px;
+
+      .btn-keyboard {
+        width: 64px;
+        height: 64px;
+        font-size: 12px;
+      }
+    }
+  }
 
   .device-list {
     overflow-y: auto;

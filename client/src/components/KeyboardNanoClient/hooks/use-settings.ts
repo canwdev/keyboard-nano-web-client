@@ -45,8 +45,8 @@ export const useSettings = ({writeData, writeDataRaw}) => {
   ]
 
   const loadSettings = async () => {
-    const {data} = await writeData(ActionType.READ, [UnitID.FUNC, 0], true)
-    console.log('读取功能设置', data)
+    const {data} = await writeData(ActionType.READ, [UnitID.ALL, 0, 0], true)
+    console.log('读取功能设置，返回值:', data)
 
     settingsForm.keyboardMode = data[4]
     settingsForm.ledMode = data[7]

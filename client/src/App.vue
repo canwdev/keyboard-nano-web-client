@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import KeyboardNanoClient from "./components/KeyboardNanoClient/KeyboardNanoClient.vue";
-import {isAxiosLoading} from "./utils/api.ts";
-import {addNotification} from "./components/CommonUI/NotificationList/notification-list.ts";
+import KeyboardNanoClient from './components/KeyboardNanoClient/KeyboardNanoClient.vue'
+import {isAxiosLoading} from './utils/api.ts'
+import {addNotification} from './components/CommonUI/NotificationList/notification-list.ts'
 
 window.$notification = addNotification
 </script>
@@ -13,7 +13,7 @@ window.$notification = addNotification
   <KeyboardNanoClient />
 </template>
 
-<style lang="scss" >
+<style lang="scss">
 .loading-layer {
   position: absolute;
   top: 0;
