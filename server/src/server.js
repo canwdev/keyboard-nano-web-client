@@ -3,8 +3,11 @@ const bodyParser = require('body-parser');
 const HID = require('node-hid'); // 引入 HID 库
 const app = express();
 const port = 3300;
+const path = require('path');
 
 app.use(bodyParser.json());
+// 添加静态资源服务中间件
+app.use(express.static(path.join(__dirname, '../dist-frontend')));
 
 let h;
 let vendorIdS = 0x2b86;
@@ -74,16 +77,16 @@ app.get('/status', (req, res) => {
 
 // 初始化设备
 app.post('/device_init', (req, res) => {
-  let {vendor_id, usage_page} = req.body;
+  let { vendor_id, usage_page } = req.body;
 
   vendor_id = Number(vendor_id) || vendorIdS;
   usage_page = Number(usage_page) || usagePageS;
 
-  console.log({vendor_id, usage_page});
+  console.log({ vendor_id, usage_page });
   const h = initUsb(vendor_id, usage_page);
 
   if (!h) {
-    return res.status(400).json({message: 'Device not found'});
+    return res.status(400).json({ message: 'Device not found' });
   } else {
     vendorIdS = vendor_id;
     usagePageS = usage_page;
@@ -100,16 +103,16 @@ app.post('/device_close', (req, res) => {
     h.close();
     h = null
   }
-  return res.json({message: "closed"});
+  return res.json({ message: "closed" });
 });
 
 // 写入数据
 app.post('/write', async (req, res) => {
   try {
-    const {buffer, isRead = false} = req.body;
+    const { buffer, isRead = false } = req.body;
 
     if (!Array.isArray(buffer) || !buffer.length) {
-      return res.status(400).json({message: "buffer is not a valid array"});
+      return res.status(400).json({ message: "buffer is not a valid array" });
     }
 
     console.log('<<< write', buffer);
@@ -117,7 +120,7 @@ app.post('/write', async (req, res) => {
     console.log('write success');
 
     if (!isRead) {
-      return res.json({message: 'write success'});
+      return res.json({ message: 'write success' });
     }
 
 
@@ -127,16 +130,16 @@ app.post('/write', async (req, res) => {
       console.log('read success', d);
 
       if (d) {
-        return res.json({data: d});
+        return res.json({ data: d });
       }
     } catch (error) {
       console.error(error)
-      return res.status(400).json({message: error.message});
+      return res.status(400).json({ message: error.message });
     }
 
   } catch (error) {
     console.error(error);
-    return res.status(400).json({message: error.message});
+    return res.status(400).json({ message: error.message });
   }
 });
 
@@ -166,7 +169,7 @@ function ping(vendorId = vendorIdS, usagePage = usagePageS, pageId = 4) {
 app.post('/ping', (req, res) => {
   const data = ping()
   console.log(data)
-  return res.json({message: data});
+  return res.json({ message: data });
 });
 // 启动服务器
 app.listen(port, () => {

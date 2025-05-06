@@ -1,11 +1,15 @@
 import {fileURLToPath, URL} from 'node:url'
-
 import {defineConfig} from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
+import {viteSingleFile} from 'vite-plugin-singlefile'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './',
+  build: {
+    outDir: '../server/dist-frontend',
+  },
   server: {
     port: 3002,
     proxy: {
@@ -21,10 +25,9 @@ export default defineConfig({
     vue(),
     AutoImport({
       dts: './src/auto-import.d.ts',
-      imports: [
-        'vue',
-      ],
+      imports: ['vue'],
     }),
+    viteSingleFile(),
   ],
   resolve: {
     alias: {
