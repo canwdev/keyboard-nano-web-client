@@ -4,6 +4,7 @@ const HID = require('node-hid'); // 引入 HID 库
 const app = express();
 const port = 3300;
 const path = require('path');
+const opener = require("opener");
 
 app.use(bodyParser.json());
 // 添加静态资源服务中间件
@@ -174,4 +175,6 @@ app.post('/ping', (req, res) => {
 // 启动服务器
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}/`);
+  opener(`http://localhost:${port}`);
 });
+

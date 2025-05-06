@@ -10,7 +10,8 @@
   "dependencies": {
     "body-parser": "^1.20.3",
     "express": "^4.21.2",
-    "node-hid": "^3.1.2"
+    "node-hid": "^3.1.2",
+    "opener": "^1.5.2"
   },
   "devDependencies": {
     "@babel/core": "^7.27.1",
