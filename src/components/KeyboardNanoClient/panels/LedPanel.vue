@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
-import type { LedEffectPreviewOption, LedGroupConfig } from '../hooks/use-led.ts'
+import type { LedGroupConfig } from '../hooks/use-led.ts'
 import LedGroupCard from './LedGroupCard.vue'
 
 const props = defineProps({
@@ -20,10 +20,6 @@ const props = defineProps({
     type: Number,
     required: true,
   },
-  effectPreviewOptions: {
-    type: Array as PropType<LedEffectPreviewOption[]>,
-    required: true,
-  },
   ledMode: {
     type: Number,
     required: true,
@@ -32,16 +28,11 @@ const props = defineProps({
     type: Number as PropType<number | null>,
     default: null,
   },
-  previewingEffectId: {
-    type: String as PropType<string | null>,
-    default: null,
-  },
 })
 
 const emit = defineEmits<{
   'closePreview': []
   'previewGroup': [groupId: number]
-  'previewEffect': [effectId: string]
   'updateGroupBrightness': [groupId: number, value: number]
   'updateGroupColor': [groupId: number, colorIndex: number, value: string]
   'update:ledEffectMode': [value: number]
@@ -74,9 +65,7 @@ const emit = defineEmits<{
           </select>
         </label>
         <div class="led-panel__actions">
-          <button class="themed-button"
-            :disabled="props.previewingGroupId === null && props.previewingEffectId === null"
-            @click="emit('closePreview')">
+          <button class="themed-button" :disabled="props.previewingGroupId === null" @click="emit('closePreview')">
             关闭预览
           </button>
         </div>
@@ -98,24 +87,6 @@ const emit = defineEmits<{
       </div>
     </fieldset>
 
-    <fieldset>
-      <legend>炫彩灯效</legend>
-
-      <div class="led-panel__hint">
-        这里是纯前端循环预览，不修改设备固件灯效模式；点击任意灯效卡片后会进入预览锁定状态，直到手动关闭。
-      </div>
-
-      <div class="led-panel__effect-list">
-        <div v-for="item in props.effectPreviewOptions" :key="item.id" class="led-panel__effect-item"
-          :class="{ 'led-panel__effect-item--active': props.previewingEffectId === item.id }" role="button" tabindex="0"
-          @click="emit('previewEffect', item.id)" @keydown.enter="emit('previewEffect', item.id)"
-          @keydown.space.prevent="emit('previewEffect', item.id)">
-          <strong>{{ item.label }}</strong>
-          <span>{{ item.description }}</span>
-          <em v-if="props.previewingEffectId === item.id">预览中</em>
-        </div>
-      </div>
-    </fieldset>
   </div>
 </template>
 
@@ -140,46 +111,6 @@ const emit = defineEmits<{
 .led-panel__actions {
   display: flex;
   justify-content: flex-start;
-}
-
-.led-panel__effect-list {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.led-panel__effect-item {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid #9c9c9c33;
-  border-radius: 8px;
-  background: #ffffff66;
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.led-panel__effect-item:hover {
-  transform: translateY(-1px);
-  border-color: #4d8d7a80;
-}
-
-.led-panel__effect-item--active {
-  border-color: #4d8d7a;
-  background: #4d8d7a14;
-}
-
-.led-panel__effect-item span {
-  color: #666;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.led-panel__effect-item em {
-  color: #4d8d7a;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 600;
 }
 
 .led-panel__hint {

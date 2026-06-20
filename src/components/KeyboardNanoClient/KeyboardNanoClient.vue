@@ -10,6 +10,7 @@ import { useLed } from './hooks/use-led.ts'
 import { useSettings } from './hooks/use-settings.ts'
 import DeviceInfoPanel from './panels/DeviceInfoPanel.vue'
 import DeviceListPanel from './panels/DeviceListPanel.vue'
+import LedEffectPanel from './panels/LedEffectPanel.vue'
 import KeyboardPanel from './panels/KeyboardPanel.vue'
 import LedPanel from './panels/LedPanel.vue'
 import SettingsPanel from './panels/SettingsPanel.vue'
@@ -37,6 +38,7 @@ enum TabType {
   SETTINGS = 0,
   KEYBOARD = 1,
   LED = 2,
+  LED_EFFECT = 3,
 }
 
 const activeTab = useStorage('keyboard_nano_client_active_tab', 0)
@@ -44,8 +46,10 @@ const tabOptions = [
   { label: '设置', value: TabType.SETTINGS },
   { label: '按键', value: TabType.KEYBOARD },
   { label: 'LED', value: TabType.LED },
+  { label: '氛围灯效', value: TabType.LED_EFFECT },
 ]
 const currentTab = computed(() => activeTab.value)
+const showTopTabActions = computed(() => currentTab.value !== TabType.LED_EFFECT)
 
 function handleTabChange(value: string | number) {
   activeTab.value = Number(value)
@@ -138,6 +142,10 @@ function syncScreenResolution() {
 }
 
 async function handleLoadCurrentTab() {
+  if (currentTab.value === TabType.LED_EFFECT) {
+    return
+  }
+
   await runWithUiBusy(loadButtonLabel.value, async () => {
     await loadCurrentTabWithRetry()
   })
@@ -152,6 +160,10 @@ function notifySaveSuccess(message: string) {
 }
 
 async function handleSaveCurrentTab() {
+  if (currentTab.value === TabType.LED_EFFECT) {
+    return
+  }
+
   await runWithUiBusy(saveButtonLabel.value, async () => {
     if (currentTab.value === TabType.KEYBOARD) {
       await saveKeyboardConfigs()
@@ -259,17 +271,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="keyboard-nano-client">
-    <DeviceInfoPanel
-      :app-version="appVersion" :is-connected="isConnected" :report-id="String(PAGE_ID)"
+    <DeviceInfoPanel :app-version="appVersion" :is-connected="isConnected" :report-id="String(PAGE_ID)"
       :usage-page="usagePage" :vendor-id="vendorId" @close="closeDevice" @connect="handleConnectDevice" @ping="sendPing"
       @refresh="getStatus" @reload="handleReloadDevice" @reset="resetDevice" @update:usage-page="usagePage = $event"
-      @update:vendor-id="vendorId = $event"
-    />
+      @update:vendor-id="vendorId = $event" />
 
     <template v-if="isConnected">
       <TabLayout :model-value="currentTab" :options="tabOptions" horizontal @update:model-value="handleTabChange">
         <template #sidebar>
-          <div style="justify-content: flex-end; padding: 0 4px; gap: 4px" class="flex-rows">
+          <div v-if="showTopTabActions" style="justify-content: flex-end; padding: 0 4px; gap: 4px" class="flex-rows">
             <button class="themed-button" @click="handleLoadCurrentTab">
               {{ loadButtonLabel }}
             </button>
@@ -279,8 +289,7 @@ onBeforeUnmount(() => {
           </div>
         </template>
 
-        <SettingsPanel
-          v-if="currentTab === TabType.SETTINGS" :keyboard-l-p="settingsForm.keyboardLP"
+        <SettingsPanel v-if="currentTab === TabType.SETTINGS" :keyboard-l-p="settingsForm.keyboardLP"
           :keyboard-mode="settingsForm.keyboardMode" :keyboard-mode-options="keyboardModeOptions"
           :led-mode="settingsForm.ledMode" :keyboard-scan-s-p="settingsForm.keyboardScanSP"
           :resolution-x="settingsForm.resolutionX" :resolution-y="settingsForm.resolutionY"
@@ -288,26 +297,23 @@ onBeforeUnmount(() => {
           @update:keyboard-mode="settingsForm.keyboardMode = $event" @update:led-mode="settingsForm.ledMode = $event"
           @update:resolution-x="settingsForm.resolutionX = $event"
           @update:resolution-y="settingsForm.resolutionY = $event"
-          @update:keyboard-scan-s-p="settingsForm.keyboardScanSP = $event"
-        />
+          @update:keyboard-scan-s-p="settingsForm.keyboardScanSP = $event" />
 
-        <KeyboardPanel
-          v-if="currentTab === TabType.KEYBOARD" :dial-key-options="dialKeyOptions"
+        <KeyboardPanel v-if="currentTab === TabType.KEYBOARD" :dial-key-options="dialKeyOptions"
           :keyboard-list="keyboardList" :media-key-options="mediaKeyOptions" :mouse-button-options="mouseButtonOptions"
           :standard-key-options="standardKeyOptions" :touch-key-options="touchKeyOptions"
-          :update-key-function="updateKeyFunction" @light-key="lightKey"
-        />
+          :update-key-function="updateKeyFunction" @light-key="lightKey" />
 
-        <LedPanel
-          v-if="currentTab === TabType.LED" :effect-preview-options="effectPreviewOptions"
-          :led-effect-mode="settingsForm.ledEffectMode" :led-effect-modes="ledEffectModes" :led-groups="ledGroups"
-          :led-mode="settingsForm.ledMode" :led-modes="ledModes" :previewing-effect-id="previewingEffectId"
-          :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
-          @preview-effect="startLedEffectPreview" @update-group-brightness="updateLedGroupBrightness"
-          @preview-group="previewLedGroup" @update-group-color="updateLedGroupColor"
-          @update:led-effect-mode="settingsForm.ledEffectMode = $event"
-          @update:led-mode="settingsForm.ledMode = $event"
-        />
+        <LedPanel v-if="currentTab === TabType.LED" :led-effect-mode="settingsForm.ledEffectMode"
+          :led-effect-modes="ledEffectModes" :led-groups="ledGroups" :led-mode="settingsForm.ledMode"
+          :led-modes="ledModes" :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
+          @update-group-brightness="updateLedGroupBrightness" @preview-group="previewLedGroup"
+          @update-group-color="updateLedGroupColor" @update:led-effect-mode="settingsForm.ledEffectMode = $event"
+          @update:led-mode="settingsForm.ledMode = $event" />
+
+        <LedEffectPanel v-if="currentTab === TabType.LED_EFFECT" :effect-preview-options="effectPreviewOptions"
+          :previewing-effect-id="previewingEffectId" @close-preview="closeLedPreview"
+          @preview-effect="startLedEffectPreview" />
       </TabLayout>
     </template>
 
