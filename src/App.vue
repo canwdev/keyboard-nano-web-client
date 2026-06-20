@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { addNotification } from './components/CommonUI/NotificationList/notification-list.ts'
 import KeyboardNanoClient from './components/KeyboardNanoClient/KeyboardNanoClient.vue'
-import {isAxiosLoading} from './utils/api.ts'
-import {addNotification} from './components/CommonUI/NotificationList/notification-list.ts'
+import { isAxiosLoading } from './utils/api.ts'
 
 window.$notification = addNotification
 </script>
 
 <template>
   <transition name="fade">
-    <div class="loading-layer" v-show="isAxiosLoading">⌛ Please Wait...</div>
+    <div v-show="isAxiosLoading" class="loading-layer">
+      ⌛ Please Wait...
+    </div>
   </transition>
   <KeyboardNanoClient />
 </template>

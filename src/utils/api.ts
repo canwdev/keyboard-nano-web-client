@@ -7,18 +7,20 @@ async function runWithLoading<T>(task: () => Promise<T>) {
   try {
     isAxiosLoading.value = true
     return await task()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     isAxiosLoading.value = false
     const message = error.response?.data?.message || error.message
 
     window.$notification({
       type: 'error',
-      message: message,
+      message,
       timeout: 5000,
     })
 
     return Promise.reject(error)
-  } finally {
+  }
+  finally {
     isAxiosLoading.value = false
   }
 }

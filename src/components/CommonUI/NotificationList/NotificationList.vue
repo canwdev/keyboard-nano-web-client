@@ -1,15 +1,14 @@
 <script lang="ts" setup>
-import {toRefs} from 'vue'
-import moment from 'moment'
-import type {INotification} from './notification-list'
+import type { INotification } from './notification-list'
+import { toRefs } from 'vue'
 import NotifyItem from './NotifyItem.vue'
 
 const props = defineProps<{
   notifications: INotification[]
 }>()
-const {notifications} = toRefs(props)
+const { notifications } = toRefs(props)
 
-const removeNotification = (index: number) => {
+function removeNotification(index: number) {
   notifications.value.splice(index, 1)
 }
 </script>

@@ -1,7 +1,7 @@
 import type { HidDevice } from '@/components/KeyboardNanoClient/types'
 
-const DEFAULT_VENDOR_ID = 0x2b86
-const DEFAULT_USAGE_PAGE = 0xffb1
+const DEFAULT_VENDOR_ID = 0x2B86
+const DEFAULT_USAGE_PAGE = 0xFFB1
 const DEFAULT_TIMEOUT_MS = 3000
 
 let activeDevice: HIDDevice | null = null
@@ -31,7 +31,7 @@ function findCollection(device: HIDDevice, usagePage?: number) {
   }
 
   if (usagePage) {
-    return collections.find((collection) => collection.usagePage === usagePage) ?? collections[0]
+    return collections.find(collection => collection.usagePage === usagePage) ?? collections[0]
   }
 
   return collections[0]
@@ -39,7 +39,7 @@ function findCollection(device: HIDDevice, usagePage?: number) {
 
 function matchesUsagePage(device: HIDDevice, usagePage: number) {
   const collections = getCollections(device)
-  return collections.some((collection) => collection.usagePage === usagePage)
+  return collections.some(collection => collection.usagePage === usagePage)
 }
 
 function matchesFilters(device: HIDDevice, vendorId: number, usagePage: number) {
@@ -93,8 +93,8 @@ async function tryRestoreDevice() {
   }
 
   const devices = await getGrantedDevices()
-  const restored =
-    devices.find((device) => matchesFilters(device, vendorIdState, usagePageState)) ?? devices[0] ?? null
+  const restored
+    = devices.find(device => matchesFilters(device, vendorIdState, usagePageState)) ?? devices[0] ?? null
 
   if (!restored) {
     activeDevice = null
@@ -114,7 +114,7 @@ async function pickDevice(vendorId: number, usagePage: number) {
   allowAutoRestore = true
 
   const grantedDevices = await getGrantedDevices()
-  const grantedDevice = grantedDevices.find((device) => matchesFilters(device, vendorId, usagePage)) ?? null
+  const grantedDevice = grantedDevices.find(device => matchesFilters(device, vendorId, usagePage)) ?? null
 
   if (grantedDevice) {
     await ensureDeviceOpen(grantedDevice)
@@ -147,14 +147,14 @@ function waitForInputReport(device: HIDDevice, timeoutMs = DEFAULT_TIMEOUT_MS) {
   return new Promise<number[]>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null
 
-    const cleanup = () => {
+    function cleanup() {
       device.removeEventListener('inputreport', handleReport)
       if (timer) {
         clearTimeout(timer)
       }
     }
 
-    const handleReport = (event: HIDInputReportEvent) => {
+    function handleReport(event: HIDInputReportEvent) {
       cleanup()
       resolve([event.reportId, ...toArray(event.data)])
     }
@@ -209,7 +209,7 @@ export async function getWebHidStatus() {
   }
 }
 
-export async function connectWebHidDevice(params?: { vendor_id?: unknown; usage_page?: unknown }) {
+export async function connectWebHidDevice(params?: { vendor_id?: unknown, usage_page?: unknown }) {
   const vendorId = normalizeNumber(params?.vendor_id, vendorIdState)
   const usagePage = normalizeNumber(params?.usage_page, usagePageState)
   const device = await pickDevice(vendorId, usagePage)
@@ -231,14 +231,14 @@ export async function closeWebHidDevice() {
   return { message: 'closed' }
 }
 
-export async function writeWebHid(params?: { buffer?: number[]; isRead?: boolean }) {
+export async function writeWebHid(params?: { buffer?: number[], isRead?: boolean }) {
   allowAutoRestore = true
   return await writeReport(params?.buffer ?? [], params?.isRead ?? false)
 }
 
 export async function pingWebHid() {
   allowAutoRestore = true
-  const buffer = new Array(60).fill(0)
+  const buffer = Array.from({ length: 60 }).fill(0) as number[]
   buffer[0] = 4
   buffer[1] = 0x03
 

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import {ref, toRefs, defineProps, defineEmits, watch} from 'vue'
-import {useVModel} from '@vueuse/core'
+import { useVModel } from '@vueuse/core'
+import { defineEmits, defineProps, ref, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
     title?: string
-    value: string
+    value?: string
     modelValue?: boolean
     closeOnClickOutside?: boolean
     inputProps?: any
@@ -28,12 +28,13 @@ watch(mVisible, (val) => {
     setTimeout(() => {
       inputRef.value.focus()
     })
-  } else {
+  }
+  else {
     emit('cancel')
   }
 })
 
-const handleConfirm = async () => {
+async function handleConfirm() {
   if (props.validator) {
     const error = await props.validator(inputText.value)
     if (error) {
@@ -44,35 +45,45 @@ const handleConfirm = async () => {
   mVisible.value = false
 }
 
-const handleOutsideClick = () => {
+function closePrompt() {
+  mVisible.value = false
+}
+
+function handleOutsideClick() {
   if (props.closeOnClickOutside) {
-    mVisible.value = false
+    closePrompt()
   }
 }
 </script>
 
 <template>
   <transition name="fade">
-    <div class="popup-window" @keydown.stop @keyup.stop @click="handleOutsideClick" v-if="mVisible">
+    <div v-if="mVisible" class="popup-window" @keydown.stop @keyup.stop @click="handleOutsideClick">
       <form
         ref="formRef"
+        class="popup-content panel-blur-bg"
         @submit.prevent="handleConfirm"
         @click.stop
-        class="popup-content panel-blur-bg"
       >
-        <div v-if="title" class="popup-title">{{ title }}</div>
+        <div v-if="title" class="popup-title">
+          {{ title }}
+        </div>
 
         <input
           ref="inputRef"
-          class="themed-input"
           v-bind="inputProps"
           v-model="inputText"
+          class="themed-input"
           required
-        />
+        >
 
         <div class="flex-row-center-gap">
-          <button class="themed-button blue" type="submit">OK</button>
-          <button type="button" class="themed-button" @click="mVisible = false">Cancel</button>
+          <button class="themed-button blue" type="submit">
+            OK
+          </button>
+          <button type="button" class="themed-button" @click="closePrompt">
+            Cancel
+          </button>
         </div>
       </form>
     </div>

@@ -1,7 +1,9 @@
 <script lang="ts">
-import {defineComponent, PropType} from 'vue'
-import {useVModel} from '@vueuse/core'
-type TabItem = {
+import type { PropType } from 'vue'
+import { useVModel } from '@vueuse/core'
+import { defineComponent } from 'vue'
+
+interface TabItem {
   label?: string
   value: string | number
   title?: string
@@ -26,35 +28,48 @@ export default defineComponent({
       },
     },
   },
-  setup(props, {emit}) {
+  setup(props, { emit }) {
     const mValue = useVModel(props, 'modelValue', emit)
+
+    function isActive(value: string | number) {
+      return mValue.value === value
+    }
+
+    function selectTab(value: string | number) {
+      mValue.value = value
+    }
+
     return {
+      isActive,
       mValue,
+      selectTab,
     }
   },
 })
 </script>
 
 <template>
-  <div class="mc-vertical-tab-layout vp-bg" :class="{horizontal}">
+  <div class="mc-vertical-tab-layout vp-bg" :class="{ horizontal }">
     <div class="sidebar-wrap">
       <div class="mc-tab-list">
         <div
           v-for="item in options"
           :key="item.value"
-          :class="{active: item.value === mValue}"
-          @click="mValue = item.value"
+          :class="{ active: isActive(item.value) }"
           class="list-item"
           :title="item.title"
+          @click="selectTab(item.value)"
         >
-          <div v-if="item.label" class="item-text">{{ item.label }}</div>
+          <div v-if="item.label" class="item-text">
+            {{ item.label }}
+          </div>
         </div>
       </div>
 
-      <slot name="sidebar"></slot>
+      <slot name="sidebar" />
     </div>
     <div class="content-wrap">
-      <slot></slot>
+      <slot />
     </div>
   </div>
 </template>

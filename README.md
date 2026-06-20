@@ -1,6 +1,8 @@
 # Keyboard nano 网页客户端
 
-正在开发中...
+正在开发中...更多信息见 [AGENTS](AGENTS.md)
+
+
 
 ## 参考
 

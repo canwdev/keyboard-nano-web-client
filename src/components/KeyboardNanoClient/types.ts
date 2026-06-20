@@ -47,5 +47,5 @@ export enum UnitID {
   // 按键3
   BTN3,
   // 全部
-  ALL = 0xff,
+  ALL = 0xFF,
 }

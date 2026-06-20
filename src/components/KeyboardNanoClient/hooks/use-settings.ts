@@ -1,7 +1,7 @@
-import {reactive} from 'vue'
-import {ActionType, PAGE_ID, UnitID} from '../types.ts'
+import { reactive } from 'vue'
+import { ActionType, PAGE_ID, UnitID } from '../types.ts'
 
-export const useSettings = ({writeData, writeDataRaw}) => {
+export function useSettings({ writeData, writeDataRaw }) {
   const settingsForm = reactive({
     keyboardMode: 0,
     ledMode: 0,
@@ -45,24 +45,21 @@ export const useSettings = ({writeData, writeDataRaw}) => {
   ]
 
   const loadSettings = async () => {
-    const {data} = await writeData(ActionType.READ, [UnitID.ALL, 0, 0], true)
-    console.log('读取功能设置，返回值:', data)
+    const { data } = await writeData(ActionType.READ, [UnitID.ALL, 0, 0], true)
 
     settingsForm.keyboardMode = data[4]
     settingsForm.ledMode = data[7]
 
     settingsForm.keyboardScanSP = data[9]
     settingsForm.keyboardLP = data[10] * 100
-    settingsForm.resolutionX = parseInt(data[12] * 255 + data[11])
-    settingsForm.resolutionY = parseInt(data[14] * 255 + data[13])
+    settingsForm.resolutionX = Number.parseInt(data[12] * 255 + data[11])
+    settingsForm.resolutionY = Number.parseInt(data[14] * 255 + data[13])
 
     settingsForm.ledEffectMode = data[15]
-
-    console.log(settingsForm)
   }
 
   const saveSettings = async () => {
-    const buffer = new Array(60).fill(0)
+    const buffer = Array.from({ length: 60 }).fill(0)
 
     buffer[0] = PAGE_ID
     buffer[1] = ActionType.WRITE
@@ -81,7 +78,6 @@ export const useSettings = ({writeData, writeDataRaw}) => {
 
     buffer[15] = settingsForm.ledEffectMode
 
-    console.log('保存设置', buffer)
     await writeDataRaw(buffer)
     await loadSettings()
   }
