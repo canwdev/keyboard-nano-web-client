@@ -1,0 +1,159 @@
+import type { HidDevice } from '../types.ts'
+import { computed, ref } from 'vue'
+import { keyboardNanoApi } from '../../../utils/api.ts'
+import { ActionType, PAGE_ID } from '../types.ts'
+
+interface DeviceLoaders {
+  loadKeyboardConfigs: () => Promise<void>
+  loadSettings: () => Promise<void>
+}
+
+async function noopAsync() { }
+
+export function useDevice() {
+  const vendorId = ref('')
+  const usagePage = ref('')
+  const isConnected = ref(false)
+  const deviceList = ref<HidDevice[]>([])
+
+  const loaders: DeviceLoaders = {
+    loadKeyboardConfigs: noopAsync,
+    loadSettings: noopAsync,
+  }
+
+  const deviceListGroupByProduct = computed(() => {
+    return deviceList.value.reduce(
+      (acc, device) => {
+        const key = device.product
+        if (!acc[key]) {
+          acc[key] = []
+        }
+        acc[key].push(device)
+        return acc
+      },
+      {} as Record<string, HidDevice[]>,
+    )
+  })
+
+  function setLoaders(nextLoaders: Partial<DeviceLoaders>) {
+    if (nextLoaders.loadSettings) {
+      loaders.loadSettings = nextLoaders.loadSettings
+    }
+
+    if (nextLoaders.loadKeyboardConfigs) {
+      loaders.loadKeyboardConfigs = nextLoaders.loadKeyboardConfigs
+    }
+  }
+
+  async function getStatus() {
+    const res = await keyboardNanoApi.getStatus() as {
+      devices: HidDevice[]
+      isConnected: boolean
+      usagePage: number | string
+      vendorId: number | string
+    }
+
+    isConnected.value = res.isConnected
+    vendorId.value = String(res.vendorId)
+    usagePage.value = String(res.usagePage)
+    deviceList.value = res.devices
+  }
+
+  async function writeDataRaw(buffer: number[] = [], isRead = false) {
+    console.log('[page] writeDataRaw', {
+      isRead,
+      buffer,
+    })
+    return await keyboardNanoApi.write({
+      buffer,
+      isRead,
+    })
+  }
+
+  async function writeData(action: ActionType, extraData: number[] = [], isRead = false) {
+    let buffer: number[] = []
+
+    buffer[0] = PAGE_ID
+    buffer[1] = action
+
+    if (extraData) {
+      buffer = [...buffer, ...extraData]
+    }
+
+    console.log('[page] writeData', {
+      action,
+      extraData,
+      isRead,
+      buffer,
+    })
+    return await writeDataRaw(buffer, isRead)
+  }
+
+  async function connectDevice() {
+    await keyboardNanoApi.deviceInit({
+      vendor_id: vendorId.value,
+      usage_page: usagePage.value,
+    })
+    await loaders.loadSettings()
+    await loaders.loadKeyboardConfigs()
+    await getStatus()
+  }
+
+  async function closeDevice() {
+    await keyboardNanoApi.deviceClose()
+    await getStatus()
+  }
+
+  async function sendPing() {
+    const { message } = await keyboardNanoApi.ping()
+    window.$notification({
+      message,
+      timeout: 5000,
+    })
+  }
+
+  async function reloadDevice() {
+    console.log('[page] reloadDevice start')
+    await writeData(ActionType.RELOAD)
+    console.log('[page] reloadDevice wait before refresh', { waitMs: 600 })
+    await new Promise(resolve => setTimeout(resolve, 600))
+    console.log('[page] reloadDevice refresh start')
+    await loaders.loadSettings()
+    await loaders.loadKeyboardConfigs()
+    console.log('[page] reloadDevice finished')
+  }
+
+  async function resetDevice() {
+    await writeData(ActionType.RESET)
+    await closeDevice()
+
+    setTimeout(() => {
+      void connectDevice()
+    }, 1000)
+  }
+
+  async function initializeDevice() {
+    await getStatus()
+    if (isConnected.value) {
+      await loaders.loadSettings()
+      await loaders.loadKeyboardConfigs()
+    }
+  }
+
+  return {
+    closeDevice,
+    connectDevice,
+    deviceListGroupByProduct,
+    getStatus,
+    initializeDevice,
+    isConnected,
+    reloadDevice,
+    resetDevice,
+    sendPing,
+    setLoaders,
+    usagePage,
+    vendorId,
+    writeData,
+    writeDataRaw,
+  }
+}

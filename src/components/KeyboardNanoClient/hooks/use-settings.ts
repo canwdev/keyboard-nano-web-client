@@ -2,6 +2,11 @@ import { reactive } from 'vue'
 import { mainJson } from '../data/index.ts'
 import { ActionType, PAGE_ID, UnitID } from '../types.ts'
 
+export interface KeyboardModeOption {
+  label: string
+  tooltip: string
+}
+
 export function useSettings({ writeData, writeDataRaw }) {
   const wait = async (ms: number) => await new Promise(resolve => setTimeout(resolve, ms))
 
@@ -17,25 +22,10 @@ export function useSettings({ writeData, writeDataRaw }) {
     ledEffectMode: 0,
   })
 
-  const keyboardModes = [
-    '自定义',
-    '歌曲切换',
-    'osu标准模式',
-    '触摸上下滑动',
-    '鼠标横向移动',
-
-    '视频控制',
-    '音量调节',
-    'osu懒人模式',
-    '模拟Dial',
-    '创作者模式1',
-
-    '创作者模式2',
-    '触摸左右滑动',
-    '鼠标纵向移动',
-    '系统应用',
-    '页面导航',
-  ]
+  const keyboardModeOptions = (mainJson.keyboard_mode_group.name as string[]).map((label, index) => ({
+    label,
+    tooltip: (mainJson.keyboard_mode_group.ToolTip as string[])[index] ?? label,
+  } satisfies KeyboardModeOption))
 
   const ledModes = ['关闭', '灯光组 1', '灯光组 2', '灯光组 3', '灯光组 4', '灯光组 5', '灯光组 6']
 
@@ -128,7 +118,7 @@ export function useSettings({ writeData, writeDataRaw }) {
 
   return {
     settingsForm,
-    keyboardModes,
+    keyboardModeOptions,
     ledModes,
     ledEffectModes,
     loadSettings,
