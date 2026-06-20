@@ -99,22 +99,16 @@ function handlePresetChange(value: string) {
       <label class="led-group-card__brightness">
         <span>亮度</span>
         <div class="led-group-card__brightness-control">
-          <input
-            :value="props.group.brightness" type="range" min="0" max="100" step="1"
-            @input="emit('updateBrightness', { groupId: props.group.id, value: Number(($event.target as HTMLInputElement).value) })"
-          >
+          <input :value="props.group.brightness" type="range" min="0" max="100" step="1"
+            @input="emit('updateBrightness', { groupId: props.group.id, value: Number(($event.target as HTMLInputElement).value) })">
           <strong>{{ props.group.brightness }}%</strong>
         </div>
       </label>
-      <label
-        v-for="(color, colorIndex) in props.group.colors" :key="`${props.group.id}-${colorIndex}`"
-        class="led-group-card__color"
-      >
+      <label v-for="(color, colorIndex) in props.group.colors" :key="`${props.group.id}-${colorIndex}`"
+        class="led-group-card__color">
         <span>{{ keyLabels[colorIndex] }}</span>
-        <input
-          :value="color" type="color"
-          @input="emit('updateColor', { groupId: props.group.id, colorIndex, value: ($event.target as HTMLInputElement).value })"
-        >
+        <input :value="color" type="color"
+          @input="emit('updateColor', { groupId: props.group.id, colorIndex, value: ($event.target as HTMLInputElement).value })">
       </label>
     </div>
   </section>
@@ -143,7 +137,6 @@ function handlePresetChange(value: string) {
 
 .led-group-card__colors {
   display: grid;
-  gap: 10px;
 }
 
 .led-group-card__preset {

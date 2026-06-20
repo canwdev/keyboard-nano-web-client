@@ -2,6 +2,7 @@
 import { useStorage } from '@vueuse/core'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { logger } from '../../utils/logger.ts'
+import { runWithUiBusy } from '../../utils/ui-busy.ts'
 import TabLayout from '../CommonUI/TabLayout.vue'
 import { useDevice } from './hooks/use-device.ts'
 import { useKeyboard } from './hooks/use-keyboard.ts'
@@ -137,31 +138,48 @@ function syncScreenResolution() {
 }
 
 async function handleLoadCurrentTab() {
-  await loadCurrentTabWithRetry()
+  await runWithUiBusy(loadButtonLabel.value, async () => {
+    await loadCurrentTabWithRetry()
+  })
+}
+
+function notifySaveSuccess(message: string) {
+  window.$notification({
+    type: 'success',
+    message,
+    timeout: 2500,
+  })
 }
 
 async function handleSaveCurrentTab() {
-  if (currentTab.value === TabType.KEYBOARD) {
-    await saveKeyboardConfigs()
-    return
-  }
+  await runWithUiBusy(saveButtonLabel.value, async () => {
+    if (currentTab.value === TabType.KEYBOARD) {
+      await saveKeyboardConfigs()
+      notifySaveSuccess('按键保存成功')
+      return
+    }
 
-  if (currentTab.value === TabType.LED) {
-    await saveLedGroups()
+    if (currentTab.value === TabType.LED) {
+      await saveLedGroups()
+      await saveSettings()
+      await loadLedGroups()
+      notifySaveSuccess('LED 保存成功')
+      return
+    }
+
     await saveSettings()
-    await loadLedGroups()
-    return
-  }
-
-  await saveSettings()
-  await loadKeyboardConfigs()
+    await loadKeyboardConfigs()
+    notifySaveSuccess('设置保存成功')
+  })
 }
 
 onMounted(async () => {
-  await initializeDevice()
-  if (isConnected.value && currentTab.value === TabType.LED) {
-    await loadCurrentTabWithRetry()
-  }
+  await runWithUiBusy('初始化设备中，请稍候...', async () => {
+    await initializeDevice()
+    if (isConnected.value && currentTab.value === TabType.LED) {
+      await loadCurrentTabWithRetry()
+    }
+  })
 })
 
 function getRGBHex(value) {
@@ -173,17 +191,21 @@ function getRGBHex(value) {
 }
 
 async function handleConnectDevice() {
-  await connectDevice()
-  if (currentTab.value === TabType.LED) {
-    await loadCurrentTabWithRetry()
-  }
+  await runWithUiBusy('连接设备中，请稍候...', async () => {
+    await connectDevice()
+    if (currentTab.value === TabType.LED) {
+      await loadCurrentTabWithRetry()
+    }
+  })
 }
 
 async function handleReloadDevice() {
-  await reloadDevice()
-  if (currentTab.value === TabType.LED) {
-    await loadCurrentTabWithRetry()
-  }
+  await runWithUiBusy('重载设备中，请稍候...', async () => {
+    await reloadDevice()
+    if (currentTab.value === TabType.LED) {
+      await loadCurrentTabWithRetry()
+    }
+  })
 }
 
 function buildLightKeyPayload(activeIndex?: number) {

@@ -57,10 +57,8 @@ const emit = defineEmits<{
       <div class="led-panel__settings">
         <label class="led-panel__field">
           灯光组：
-          <select
-            :value="props.ledMode"
-            @change="emit('update:ledMode', Number(($event.target as HTMLSelectElement).value))"
-          >
+          <select :value="props.ledMode"
+            @change="emit('update:ledMode', Number(($event.target as HTMLSelectElement).value))">
             <option v-for="(item, index) in props.ledModes" :key="index" :value="index">
               {{ item }}
             </option>
@@ -68,21 +66,17 @@ const emit = defineEmits<{
         </label>
         <label class="led-panel__field">
           灯效：
-          <select
-            :value="props.ledEffectMode"
-            @change="emit('update:ledEffectMode', Number(($event.target as HTMLSelectElement).value))"
-          >
+          <select :value="props.ledEffectMode"
+            @change="emit('update:ledEffectMode', Number(($event.target as HTMLSelectElement).value))">
             <option v-for="(item, index) in props.ledEffectModes" :key="index" :value="index">
               {{ item }}
             </option>
           </select>
         </label>
         <div class="led-panel__actions">
-          <button
-            class="themed-button"
+          <button class="themed-button"
             :disabled="props.previewingGroupId === null && props.previewingEffectId === null"
-            @click="emit('closePreview')"
-          >
+            @click="emit('closePreview')">
             关闭预览
           </button>
         </div>
@@ -93,19 +87,14 @@ const emit = defineEmits<{
       <legend>灯光组颜色</legend>
 
       <div class="led-panel__hint">
-        每个灯光组包含 3 个键位颜色。亮度为前端模拟，会在预览和保存时按比例缩放 RGB 数值；保存后写入设备的是缩放后的颜色值。
-      </div>
-      <div class="led-panel__hint">
-        点击单组的“预览”可临时点亮查看，保存后才会写入设备配置。若开启下方炫彩灯效预览，会覆盖当前单组预览直到手动关闭。
+        每个灯光组包含 3 个键位颜色。亮度为前端模拟，会在预览和保存时按比例缩放 RGB 数值；保存后写入设备的是缩放后的颜色值。点击单组的“预览”可临时点亮查看，保存后才会写入设备配置。
       </div>
 
       <div class="led-panel__groups">
-        <LedGroupCard
-          v-for="group in props.ledGroups" :key="group.id" :group="group"
+        <LedGroupCard v-for="group in props.ledGroups" :key="group.id" :group="group"
           :is-previewing="props.previewingGroupId === group.id" @preview="emit('previewGroup', $event)"
           @update-brightness="emit('updateGroupBrightness', $event.groupId, $event.value)"
-          @update-color="emit('updateGroupColor', $event.groupId, $event.colorIndex, $event.value)"
-        />
+          @update-color="emit('updateGroupColor', $event.groupId, $event.colorIndex, $event.value)" />
       </div>
     </fieldset>
 
@@ -117,12 +106,10 @@ const emit = defineEmits<{
       </div>
 
       <div class="led-panel__effect-list">
-        <div
-          v-for="item in props.effectPreviewOptions" :key="item.id" class="led-panel__effect-item"
+        <div v-for="item in props.effectPreviewOptions" :key="item.id" class="led-panel__effect-item"
           :class="{ 'led-panel__effect-item--active': props.previewingEffectId === item.id }" role="button" tabindex="0"
           @click="emit('previewEffect', item.id)" @keydown.enter="emit('previewEffect', item.id)"
-          @keydown.space.prevent="emit('previewEffect', item.id)"
-        >
+          @keydown.space.prevent="emit('previewEffect', item.id)">
           <strong>{{ item.label }}</strong>
           <span>{{ item.description }}</span>
           <em v-if="props.previewingEffectId === item.id">预览中</em>

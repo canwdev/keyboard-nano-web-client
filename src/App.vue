@@ -5,10 +5,22 @@ import KeyboardNanoClient from './components/KeyboardNanoClient/KeyboardNanoClie
 import { isAxiosLoading } from './utils/api.ts'
 import { setAppDebugLogging } from './utils/logger.ts'
 import { isPreviewLockActive, isPreviewStopping, previewLockMessage, stopPreviewFromOverlay } from './utils/preview-lock.ts'
+import { isUiBusy, uiBusyMessage } from './utils/ui-busy.ts'
 
 window.$notification = addNotification
 window.__setKeyboardNanoDebugLog = setAppDebugLogging
-const isGlobalOverlayVisible = computed(() => isAxiosLoading.value || isPreviewLockActive.value)
+const isGlobalOverlayVisible = computed(() => isAxiosLoading.value || isPreviewLockActive.value || isUiBusy.value)
+const globalOverlayMessage = computed(() => {
+  if (isPreviewLockActive.value) {
+    return previewLockMessage.value
+  }
+
+  if (isUiBusy.value) {
+    return uiBusyMessage.value
+  }
+
+  return '设备通信中，请稍候...'
+})
 </script>
 
 <template>
@@ -16,11 +28,9 @@ const isGlobalOverlayVisible = computed(() => isAxiosLoading.value || isPreviewL
     <div v-show="isGlobalOverlayVisible" class="loading-layer">
       <div class="loading-card">
         <div v-if="!isPreviewLockActive" class="loading-spinner" />
-        <div>{{ isPreviewLockActive ? previewLockMessage : '设备通信中，请稍候...' }}</div>
-        <button
-          v-if="isPreviewLockActive" class="loading-stop-button" :disabled="isPreviewStopping"
-          @click="stopPreviewFromOverlay"
-        >
+        <div>{{ globalOverlayMessage }}</div>
+        <button v-if="isPreviewLockActive" class="loading-stop-button" :disabled="isPreviewStopping"
+          @click="stopPreviewFromOverlay">
           {{ isPreviewStopping ? '停止中...' : '停止预览' }}
         </button>
       </div>
@@ -89,5 +99,9 @@ const isGlobalOverlayVisible = computed(() => isAxiosLoading.value || isPreviewL
   to {
     transform: rotate(360deg);
   }
+}
+
+fieldset {
+  border-radius: 5px;
 }
 </style>

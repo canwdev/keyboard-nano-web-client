@@ -425,7 +425,7 @@ export function useLed(options: LedHookOptions) {
 
     clearAutoPreviewTimer()
     stopEffectPreviewLoop()
-    setPreviewLock('灯效预览中，其他操作已锁定。', closeLedPreview)
+    setPreviewLock('灯效预览中', closeLedPreview)
     previewingEffectId.value = effectId
     await previewLedEffectFrame(effectId, 0)
     ensureEffectWorker().postMessage({
