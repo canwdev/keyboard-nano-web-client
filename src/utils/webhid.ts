@@ -8,6 +8,7 @@ let activeDevice: HIDDevice | null = null
 let vendorIdState = DEFAULT_VENDOR_ID
 let usagePageState = DEFAULT_USAGE_PAGE
 let allowAutoRestore = true
+let operationQueue = Promise.resolve()
 
 function ensureWebHidSupport() {
   if (!('hid' in navigator)) {
@@ -93,8 +94,7 @@ async function tryRestoreDevice() {
   }
 
   const devices = await getGrantedDevices()
-  const restored
-    = devices.find(device => matchesFilters(device, vendorIdState, usagePageState)) ?? devices[0] ?? null
+  const restored = devices.find(device => matchesFilters(device, vendorIdState, usagePageState)) ?? null
 
   if (!restored) {
     activeDevice = null
@@ -143,11 +143,19 @@ async function ensureActiveDevice() {
   return device
 }
 
-function waitForInputReport(device: HIDDevice, timeoutMs = DEFAULT_TIMEOUT_MS) {
-  return new Promise<number[]>((resolve, reject) => {
+function enqueueDeviceOperation<T>(task: () => Promise<T>) {
+  const nextTask = operationQueue.then(task)
+  operationQueue = nextTask.then(() => undefined, () => undefined)
+  return nextTask
+}
+
+function waitForInputReport(device: HIDDevice, expectedReportId: number, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  let cleanup = () => { }
+
+  const promise = new Promise<number[]>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null
 
-    function cleanup() {
+    cleanup = () => {
       device.removeEventListener('inputreport', handleReport)
       if (timer) {
         clearTimeout(timer)
@@ -155,6 +163,10 @@ function waitForInputReport(device: HIDDevice, timeoutMs = DEFAULT_TIMEOUT_MS) {
     }
 
     function handleReport(event: HIDInputReportEvent) {
+      if (event.reportId !== expectedReportId) {
+        return
+      }
+
       cleanup()
       resolve([event.reportId, ...toArray(event.data)])
     }
@@ -166,6 +178,11 @@ function waitForInputReport(device: HIDDevice, timeoutMs = DEFAULT_TIMEOUT_MS) {
 
     device.addEventListener('inputreport', handleReport, { once: true })
   })
+
+  return {
+    cancel: cleanup,
+    promise,
+  }
 }
 
 async function writeReport(buffer: number[], isRead = false) {
@@ -175,15 +192,21 @@ async function writeReport(buffer: number[], isRead = false) {
 
   const device = await ensureActiveDevice()
   const [reportId, ...payload] = buffer
-  const readTask = isRead ? waitForInputReport(device) : null
+  const readTask = isRead ? waitForInputReport(device, reportId) : null
 
-  await device.sendReport(reportId, new Uint8Array(payload))
+  try {
+    await device.sendReport(reportId, new Uint8Array(payload))
+  }
+  catch (error) {
+    readTask?.cancel()
+    throw error
+  }
 
   if (!readTask) {
     return { message: 'write success' }
   }
 
-  const data = await readTask
+  const data = await readTask.promise
   return { data }
 }
 
@@ -222,31 +245,34 @@ export async function connectWebHidDevice(params?: { vendor_id?: unknown, usage_
 
 export async function closeWebHidDevice() {
   allowAutoRestore = false
+  return await enqueueDeviceOperation(async () => {
+    if (activeDevice?.opened) {
+      await activeDevice.close()
+    }
 
-  if (activeDevice?.opened) {
-    await activeDevice.close()
-  }
-
-  activeDevice = null
-  return { message: 'closed' }
+    activeDevice = null
+    return { message: 'closed' }
+  })
 }
 
 export async function writeWebHid(params?: { buffer?: number[], isRead?: boolean }) {
   allowAutoRestore = true
-  return await writeReport(params?.buffer ?? [], params?.isRead ?? false)
+  return await enqueueDeviceOperation(async () => await writeReport(params?.buffer ?? [], params?.isRead ?? false))
 }
 
 export async function pingWebHid() {
   allowAutoRestore = true
-  const buffer = Array.from({ length: 60 }).fill(0) as number[]
-  buffer[0] = 4
-  buffer[1] = 0x03
+  return await enqueueDeviceOperation(async () => {
+    const buffer = Array.from({ length: 60 }).fill(0) as number[]
+    buffer[0] = 4
+    buffer[1] = 0x03
 
-  const startTime = performance.now()
-  await writeReport(buffer, true)
-  const endTime = performance.now()
+    const startTime = performance.now()
+    await writeReport(buffer, true)
+    const endTime = performance.now()
 
-  return {
-    message: `Pong! ${Math.round(endTime - startTime)}ms`,
-  }
+    return {
+      message: `Pong! ${Math.round(endTime - startTime)}ms`,
+    }
+  })
 }
