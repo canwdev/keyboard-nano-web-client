@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import TabLayout from '../CommonUI/TabLayout.vue'
 import { useDevice } from './hooks/use-device.ts'
 import { useKeyboard } from './hooks/use-keyboard.ts'
@@ -74,6 +74,7 @@ setLoaders({
 })
 const loadButtonLabel = computed(() => currentTab.value === TabType.KEYBOARD ? '读取按键' : '读取设置')
 const saveButtonLabel = computed(() => currentTab.value === TabType.KEYBOARD ? '保存按键' : '保存设置')
+let lightKeyTimer: ReturnType<typeof setTimeout> | undefined
 
 async function handleLoadCurrentTab() {
   if (currentTab.value === TabType.KEYBOARD) {
@@ -139,11 +140,11 @@ async function testColor() {
   await writeData(ActionType.COMMAND, data)
 }
 
-async function lightKey(index: number) {
+function buildLightKeyPayload(activeIndex?: number) {
   const data: any[] = [UnitID.LED, 0]
 
   keyboardList.value.forEach((item, idx) => {
-    if (idx === index) {
+    if (activeIndex !== undefined && idx === activeIndex) {
       const { r, g, b } = getRGBHex('#FFFFFF')
 
       // B
@@ -163,8 +164,29 @@ async function lightKey(index: number) {
     }
   })
 
-  await writeData(ActionType.COMMAND, data)
+  return data
 }
+
+async function lightKey(index: number) {
+  if (lightKeyTimer) {
+    clearTimeout(lightKeyTimer)
+    lightKeyTimer = undefined
+  }
+
+  await writeData(ActionType.COMMAND, buildLightKeyPayload(index))
+
+  lightKeyTimer = setTimeout(() => {
+    lightKeyTimer = undefined
+    void writeData(ActionType.COMMAND, buildLightKeyPayload())
+  }, 1000)
+}
+
+onBeforeUnmount(() => {
+  if (lightKeyTimer) {
+    clearTimeout(lightKeyTimer)
+    lightKeyTimer = undefined
+  }
+})
 </script>
 
 <template>
