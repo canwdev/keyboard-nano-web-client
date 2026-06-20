@@ -1,16 +1,17 @@
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import TabLayout from '../CommonUI/TabLayout.vue'
 import { useDevice } from './hooks/use-device.ts'
 import { useKeyboard } from './hooks/use-keyboard.ts'
+import { useLed } from './hooks/use-led.ts'
 import { useSettings } from './hooks/use-settings.ts'
 import DeviceInfoPanel from './panels/DeviceInfoPanel.vue'
 import DeviceListPanel from './panels/DeviceListPanel.vue'
 import KeyboardPanel from './panels/KeyboardPanel.vue'
 import LedPanel from './panels/LedPanel.vue'
 import SettingsPanel from './panels/SettingsPanel.vue'
-import { ActionType, UnitID } from './types.ts'
+import { ActionType, PAGE_ID, UnitID } from './types.ts'
 
 const appVersion = __APP_VERSION__
 const {
@@ -68,26 +69,82 @@ const {
     y: settingsForm.resolutionY,
   }),
 })
+const {
+  closeLedPreview,
+  ledGroups,
+  loadLedGroups,
+  previewingGroupId,
+  previewLedGroup,
+  saveLedGroups,
+  updateLedGroupColor,
+} = useLed({
+  writeData,
+  writeDataRaw,
+})
 setLoaders({
   loadSettings,
   loadKeyboardConfigs,
 })
-const loadButtonLabel = computed(() => currentTab.value === TabType.KEYBOARD ? '读取按键' : '读取设置')
-const saveButtonLabel = computed(() => currentTab.value === TabType.KEYBOARD ? '保存按键' : '保存设置')
+const loadButtonLabel = computed(() =>
+  currentTab.value === TabType.KEYBOARD ? '读取按键' : currentTab.value === TabType.LED ? '读取LED' : '读取设置',
+)
+const saveButtonLabel = computed(() =>
+  currentTab.value === TabType.KEYBOARD ? '保存按键' : currentTab.value === TabType.LED ? '保存LED' : '保存设置',
+)
 let lightKeyTimer: ReturnType<typeof setTimeout> | undefined
 
-async function handleLoadCurrentTab() {
-  if (currentTab.value === TabType.KEYBOARD) {
-    await loadKeyboardConfigs()
-    return
-  }
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
-  await loadSettings()
+function shouldRetryRead(error: unknown) {
+  return error instanceof Error && /读取设备超时|设备未连接/.test(error.message)
+}
+
+async function loadCurrentTabWithRetry() {
+  const task = currentTab.value === TabType.KEYBOARD
+    ? async () => await loadKeyboardConfigs()
+    : currentTab.value === TabType.LED
+      ? async () => {
+        await loadSettings()
+        await loadLedGroups()
+      }
+      : async () => await loadSettings()
+
+  try {
+    await task()
+  }
+  catch (error) {
+    if (!shouldRetryRead(error)) {
+      throw error
+    }
+
+    console.warn('[page] loadCurrentTab retry', { error })
+    await wait(250)
+    await getStatus()
+    await task()
+  }
+}
+
+function syncScreenResolution() {
+  settingsForm.resolutionX = Math.max(50, Math.trunc(window.screen.width || 0))
+  settingsForm.resolutionY = Math.max(50, Math.trunc(window.screen.height || 0))
+}
+
+async function handleLoadCurrentTab() {
+  await loadCurrentTabWithRetry()
 }
 
 async function handleSaveCurrentTab() {
   if (currentTab.value === TabType.KEYBOARD) {
     await saveKeyboardConfigs()
+    return
+  }
+
+  if (currentTab.value === TabType.LED) {
+    await saveLedGroups()
+    await saveSettings()
+    await loadLedGroups()
     return
   }
 
@@ -97,9 +154,11 @@ async function handleSaveCurrentTab() {
 
 onMounted(async () => {
   await initializeDevice()
+  if (isConnected.value && currentTab.value === TabType.LED) {
+    await loadCurrentTabWithRetry()
+  }
 })
 
-// 提取6位hex颜色值为RGB数字
 function getRGBHex(value) {
   return {
     r: Number.parseInt(value.slice(1, 3), 16),
@@ -107,37 +166,19 @@ function getRGBHex(value) {
     b: Number.parseInt(value.slice(5, 7), 16),
   }
 }
-const colorList = ref(['#ff0000', '#00ff00', '#0000ff'])
 
-function updateColor(index: number, value: string) {
-  colorList.value[index] = value
+async function handleConnectDevice() {
+  await connectDevice()
+  if (currentTab.value === TabType.LED) {
+    await loadCurrentTabWithRetry()
+  }
 }
 
-async function testColor() {
-  const data: any[] = [UnitID.LED, 0]
-  // data[4] = 0x00  // 1-B
-  // data[5] = 0x00  // 1-R
-  // data[6] = 0x00  // 1-G
-  //
-  // data[7] = 0x00  // 2-B
-  // data[8] = 0xff  // 2-R
-  // data[9] = 0x00  // 2-G
-  //
-  // data[10] = 0x00  // 3-B
-  // data[11] = 0x00  // 3-R
-  // data[12] = 0x00  // 3-G
-
-  colorList.value.forEach((h6) => {
-    const { r, g, b } = getRGBHex(h6)
-    // B
-    data.push(b)
-    // R
-    data.push(r)
-    // G
-    data.push(g)
-  })
-
-  await writeData(ActionType.COMMAND, data)
+async function handleReloadDevice() {
+  await reloadDevice()
+  if (currentTab.value === TabType.LED) {
+    await loadCurrentTabWithRetry()
+  }
 }
 
 function buildLightKeyPayload(activeIndex?: number) {
@@ -192,9 +233,10 @@ onBeforeUnmount(() => {
 <template>
   <div class="keyboard-nano-client">
     <DeviceInfoPanel
-      :app-version="appVersion" :is-connected="isConnected" :usage-page="usagePage" :vendor-id="vendorId"
-      @close="closeDevice" @connect="connectDevice" @ping="sendPing" @refresh="getStatus" @reload="reloadDevice"
-      @reset="resetDevice" @update:usage-page="usagePage = $event" @update:vendor-id="vendorId = $event"
+      :app-version="appVersion" :is-connected="isConnected" :report-id="String(PAGE_ID)"
+      :usage-page="usagePage" :vendor-id="vendorId" @close="closeDevice" @connect="handleConnectDevice" @ping="sendPing"
+      @refresh="getStatus" @reload="handleReloadDevice" @reset="resetDevice" @update:usage-page="usagePage = $event"
+      @update:vendor-id="vendorId = $event"
     />
 
     <template v-if="isConnected">
@@ -213,9 +255,12 @@ onBeforeUnmount(() => {
         <SettingsPanel
           v-if="currentTab === TabType.SETTINGS" :keyboard-l-p="settingsForm.keyboardLP"
           :keyboard-mode="settingsForm.keyboardMode" :keyboard-mode-options="keyboardModeOptions"
-          :keyboard-scan-s-p="settingsForm.keyboardScanSP" :resolution-x="settingsForm.resolutionX"
-          :resolution-y="settingsForm.resolutionY" @update:keyboard-l-p="settingsForm.keyboardLP = $event"
-          @update:keyboard-mode="settingsForm.keyboardMode = $event"
+          :led-mode="settingsForm.ledMode" :keyboard-scan-s-p="settingsForm.keyboardScanSP"
+          :resolution-x="settingsForm.resolutionX" :resolution-y="settingsForm.resolutionY"
+          @update:keyboard-l-p="settingsForm.keyboardLP = $event" @get-resolution="syncScreenResolution"
+          @update:keyboard-mode="settingsForm.keyboardMode = $event" @update:led-mode="settingsForm.ledMode = $event"
+          @update:resolution-x="settingsForm.resolutionX = $event"
+          @update:resolution-y="settingsForm.resolutionY = $event"
           @update:keyboard-scan-s-p="settingsForm.keyboardScanSP = $event"
         />
 
@@ -227,9 +272,10 @@ onBeforeUnmount(() => {
         />
 
         <LedPanel
-          v-if="currentTab === TabType.LED" :color-list="colorList"
-          :led-effect-mode="settingsForm.ledEffectMode" :led-effect-modes="ledEffectModes"
-          :led-mode="settingsForm.ledMode" :led-modes="ledModes" @test-color="testColor" @update-color="updateColor"
+          v-if="currentTab === TabType.LED" :led-effect-mode="settingsForm.ledEffectMode"
+          :led-effect-modes="ledEffectModes" :led-groups="ledGroups" :led-mode="settingsForm.ledMode"
+          :led-modes="ledModes" :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
+          @preview-group="previewLedGroup" @update-group-color="updateLedGroupColor"
           @update:led-effect-mode="settingsForm.ledEffectMode = $event"
           @update:led-mode="settingsForm.ledMode = $event"
         />

@@ -2,6 +2,7 @@
 const props = defineProps<{
   appVersion: string
   isConnected: boolean
+  reportId: string
   usagePage: string
   vendorId: string
 }>()
@@ -22,36 +23,41 @@ const emit = defineEmits<{
   <section class="device-info-panel">
     <header class="device-info-panel__header">
       <h1>Keyboard Nano Client</h1>
-      <span class="device-info-panel__version">v{{ props.appVersion }}</span>
+      <span class="device-info-panel__version flex-rows">
+
+        <a href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md" target="_blank">
+          通信协议
+        </a>
+
+        <a href="https://github.com/canwdev/keyboard-nano-web-client" target="_blank">Github</a>
+
+        <span>v{{ props.appVersion }}</span>
+      </span>
     </header>
 
     <fieldset>
       <legend>设备信息</legend>
 
-      <div class="flex-cols">
-        <div class="flex-rows">
-          <label>
-            vendorId
+      <div class="device-info-panel__content">
+        <div class="device-info-panel__inputs">
+          <label class="device-info-panel__field">
+            <span>vendor_id:</span>
             <input
               class="themed-input" :disabled="props.isConnected" :value="props.vendorId" type="text"
               @input="emit('update:vendorId', ($event.target as HTMLInputElement).value)"
             >
           </label>
-          <label>
-            usagePage
+          <label class="device-info-panel__field">
+            <span>vendor_page:</span>
             <input
               class="themed-input" :disabled="props.isConnected" :value="props.usagePage" type="text"
               @input="emit('update:usagePage', ($event.target as HTMLInputElement).value)"
             >
           </label>
-        </div>
-
-        <div class="flex-rows">
-          <a href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md" target="_blank">
-            通信协议
-          </a>
-
-          <a href="https://github.com/canwdev/keyboard-nano-web-client" target="_blank">Github</a>
+          <label class="device-info-panel__field">
+            <span>usage_id:</span>
+            <input class="themed-input" :value="props.reportId" type="text" readonly>
+          </label>
         </div>
 
         <div class="flex-rows device-info-panel__actions">
@@ -109,5 +115,31 @@ const emit = defineEmits<{
 
 .device-info-panel__actions {
   justify-content: flex-end;
+}
+
+.device-info-panel__content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.device-info-panel__inputs {
+  display: grid;
+  gap: 12px;
+}
+
+.device-info-panel__field {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.device-info-panel__field span {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.device-info-panel__field input {
+  font-family: Consolas, 'Courier New', monospace;
 }
 </style>

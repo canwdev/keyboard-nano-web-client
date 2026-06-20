@@ -10,6 +10,22 @@ interface DeviceLoaders {
 
 async function noopAsync() { }
 
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function shouldRetryLoad(error: unknown) {
+  return error instanceof Error && /读取设备超时|设备未连接/.test(error.message)
+}
+
+function formatHex(value: number | string) {
+  const normalized = Number(value)
+  if (!Number.isFinite(normalized)) {
+    return String(value)
+  }
+  return `0x${normalized.toString(16).toUpperCase()}`
+}
+
 export function useDevice() {
   const vendorId = ref('')
   const usagePage = ref('')
@@ -45,6 +61,27 @@ export function useDevice() {
     }
   }
 
+  async function runLoadersWithRetry(context: string) {
+    try {
+      await loaders.loadSettings()
+      await loaders.loadKeyboardConfigs()
+    }
+    catch (error) {
+      if (!shouldRetryLoad(error)) {
+        throw error
+      }
+
+      console.warn('[page] loader retry', {
+        context,
+        error,
+      })
+      await wait(250)
+      await getStatus()
+      await loaders.loadSettings()
+      await loaders.loadKeyboardConfigs()
+    }
+  }
+
   async function getStatus() {
     const res = await keyboardNanoApi.getStatus() as {
       devices: HidDevice[]
@@ -54,8 +91,8 @@ export function useDevice() {
     }
 
     isConnected.value = res.isConnected
-    vendorId.value = String(res.vendorId)
-    usagePage.value = String(res.usagePage)
+    vendorId.value = formatHex(res.vendorId)
+    usagePage.value = formatHex(res.usagePage)
     deviceList.value = res.devices
   }
 
@@ -94,9 +131,9 @@ export function useDevice() {
       vendor_id: vendorId.value,
       usage_page: usagePage.value,
     })
-    await loaders.loadSettings()
-    await loaders.loadKeyboardConfigs()
     await getStatus()
+    await wait(200)
+    await runLoadersWithRetry('connect')
   }
 
   async function closeDevice() {
@@ -116,10 +153,9 @@ export function useDevice() {
     console.log('[page] reloadDevice start')
     await writeData(ActionType.RELOAD)
     console.log('[page] reloadDevice wait before refresh', { waitMs: 600 })
-    await new Promise(resolve => setTimeout(resolve, 600))
+    await wait(600)
     console.log('[page] reloadDevice refresh start')
-    await loaders.loadSettings()
-    await loaders.loadKeyboardConfigs()
+    await runLoadersWithRetry('reload')
     console.log('[page] reloadDevice finished')
   }
 
@@ -135,8 +171,7 @@ export function useDevice() {
   async function initializeDevice() {
     await getStatus()
     if (isConnected.value) {
-      await loaders.loadSettings()
-      await loaders.loadKeyboardConfigs()
+      await runLoadersWithRetry('initialize')
     }
   }
 
