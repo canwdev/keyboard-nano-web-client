@@ -8,16 +8,8 @@ const props = defineProps({
     type: Array as PropType<LedGroupConfig[]>,
     required: true,
   },
-  ledEffectModes: {
-    type: Array as PropType<string[]>,
-    required: true,
-  },
   ledModes: {
     type: Array as PropType<string[]>,
-    required: true,
-  },
-  ledEffectMode: {
-    type: Number,
     required: true,
   },
   ledMode: {
@@ -35,7 +27,6 @@ const emit = defineEmits<{
   'previewGroup': [groupId: number]
   'updateGroupBrightness': [groupId: number, value: number]
   'updateGroupColor': [groupId: number, colorIndex: number, value: string]
-  'update:ledEffectMode': [value: number]
   'update:ledMode': [value: number]
 }>()
 </script>
@@ -47,19 +38,10 @@ const emit = defineEmits<{
 
       <div class="led-panel__settings">
         <label class="led-panel__field">
-          灯光组：
+          当前使用的灯光组：
           <select :value="props.ledMode"
             @change="emit('update:ledMode', Number(($event.target as HTMLSelectElement).value))">
             <option v-for="(item, index) in props.ledModes" :key="index" :value="index">
-              {{ item }}
-            </option>
-          </select>
-        </label>
-        <label class="led-panel__field">
-          灯效：
-          <select :value="props.ledEffectMode"
-            @change="emit('update:ledEffectMode', Number(($event.target as HTMLSelectElement).value))">
-            <option v-for="(item, index) in props.ledEffectModes" :key="index" :value="index">
               {{ item }}
             </option>
           </select>
@@ -86,7 +68,6 @@ const emit = defineEmits<{
           @update-color="emit('updateGroupColor', $event.groupId, $event.colorIndex, $event.value)" />
       </div>
     </fieldset>
-
   </div>
 </template>
 

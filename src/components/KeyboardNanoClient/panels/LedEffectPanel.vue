@@ -7,6 +7,14 @@ const props = defineProps({
     type: Array as PropType<LedEffectPreviewOption[]>,
     required: true,
   },
+  ledEffectMode: {
+    type: Number,
+    required: true,
+  },
+  ledEffectModes: {
+    type: Array as PropType<string[]>,
+    required: true,
+  },
   previewingEffectId: {
     type: String as PropType<string | null>,
     default: null,
@@ -14,19 +22,31 @@ const props = defineProps({
 })
 
 const emit = defineEmits<{
-  closePreview: []
-  previewEffect: [effectId: string]
+  'closePreview': []
+  'previewEffect': [effectId: string]
+  'update:ledEffectMode': [value: number]
 }>()
 </script>
 
 <template>
   <div class="led-effect-panel">
     <fieldset>
-      <legend>氛围灯效</legend>
+      <legend>设备灯效</legend>
+      <div class="led-effect-panel__mode-list">
+        <label v-for="(item, index) in props.ledEffectModes" :key="index" class="led-effect-panel__mode-option">
+          <input :checked="props.ledEffectMode === index" type="radio" name="device-led-effect" :value="index"
+            @change="emit('update:ledEffectMode', index)">
+          <span>{{ item }}</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>炫彩预览</legend>
 
       <div class="led-effect-panel__toolbar">
         <div class="led-effect-panel__hint">
-          这里是纯前端循环预览，不修改设备固件灯效模式；点击任意灯效卡片后会进入预览锁定状态，直到手动关闭。
+          这里是纯前端循环预览，不修改设备固件灯效模式。
         </div>
         <!-- <button class="themed-button" :disabled="!props.previewingEffectId" @click="emit('closePreview')">
           关闭预览
@@ -64,6 +84,17 @@ const emit = defineEmits<{
   color: #666;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.led-effect-panel__mode-list {
+  display: grid;
+  gap: 2px;
+}
+
+.led-effect-panel__mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .led-effect-panel__list {

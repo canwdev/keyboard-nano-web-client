@@ -38,21 +38,68 @@ export function useSettings({ writeData, writeDataRaw }) {
     '按下熄灭',
   ]
 
-  const loadSettings = async () => {
-    logger.debug('[settings] load start')
-    const { data } = await writeData(ActionType.READ, [UnitID.FUNC, 0, 0], true)
-    logger.debug('[settings] load response', data)
-
+  function applySettingsResponse(data: number[]) {
     settingsForm.keyboardMode = data[4]
     settingsForm.ledMode = data[7]
 
     settingsForm.keyboardScanSP = data[9]
     settingsForm.keyboardLP = data[10] * 100
-    settingsForm.resolutionX = Number.parseInt(data[12] * 255 + data[11])
-    settingsForm.resolutionY = Number.parseInt(data[14] * 255 + data[13])
-
+    settingsForm.resolutionX = data[12] * 255 + data[11]
+    settingsForm.resolutionY = data[14] * 255 + data[13]
     settingsForm.ledEffectMode = data[15]
+  }
+
+  async function readSettingsData() {
+    const { data } = await writeData(ActionType.READ, [UnitID.FUNC, 0, 0], true)
+    return data as number[]
+  }
+
+  function buildSettingsWriteBuffer(baseData: number[]) {
+    const buffer = Array.from({ length: 60 }, (_, index) => Number(baseData[index] ?? 0))
+    buffer[0] = PAGE_ID
+    buffer[1] = ActionType.WRITE
+    buffer[2] = UnitID.FUNC
+    buffer[3] = 0
+    return buffer
+  }
+
+  async function writePartialSettings(updateBuffer: (buffer: number[]) => void, logKey: string) {
+    logger.debug(`[settings] ${logKey} save start`)
+    const currentData = await readSettingsData()
+    const buffer = buildSettingsWriteBuffer(currentData)
+    updateBuffer(buffer)
+    logger.debug(`[settings] ${logKey} save request`, { buffer })
+    await writeDataRaw(buffer)
+    logger.debug(`[settings] ${logKey} save write finished, wait before reload`)
+    await wait(1000)
+    await writeData(ActionType.RELOAD)
+    logger.debug(`[settings] ${logKey} save reload finished, wait before refresh`)
+    await wait(300)
+    await loadSettings()
+  }
+
+  const loadSettings = async () => {
+    logger.debug('[settings] load start')
+    const data = await readSettingsData()
+    logger.debug('[settings] load response', data)
+    applySettingsResponse(data)
     logger.debug('[settings] load applied', { ...settingsForm })
+  }
+
+  const loadLedModeSetting = async () => await loadSettings()
+
+  const loadLedEffectSetting = async () => await loadSettings()
+
+  const saveLedModeSetting = async () => {
+    await writePartialSettings((buffer) => {
+      buffer[7] = settingsForm.ledMode
+    }, 'led-mode')
+  }
+
+  const saveLedEffectSetting = async () => {
+    await writePartialSettings((buffer) => {
+      buffer[15] = settingsForm.ledEffectMode
+    }, 'led-effect')
   }
 
   const saveSettings = async () => {
@@ -123,6 +170,10 @@ export function useSettings({ writeData, writeDataRaw }) {
     ledModes,
     ledEffectModes,
     loadSettings,
+    loadLedEffectSetting,
+    loadLedModeSetting,
     saveSettings,
+    saveLedEffectSetting,
+    saveLedModeSetting,
   }
 }

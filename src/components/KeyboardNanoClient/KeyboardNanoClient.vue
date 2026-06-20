@@ -10,8 +10,8 @@ import { useLed } from './hooks/use-led.ts'
 import { useSettings } from './hooks/use-settings.ts'
 import DeviceInfoPanel from './panels/DeviceInfoPanel.vue'
 import DeviceListPanel from './panels/DeviceListPanel.vue'
-import LedEffectPanel from './panels/LedEffectPanel.vue'
 import KeyboardPanel from './panels/KeyboardPanel.vue'
+import LedEffectPanel from './panels/LedEffectPanel.vue'
 import LedPanel from './panels/LedPanel.vue'
 import SettingsPanel from './panels/SettingsPanel.vue'
 import { ActionType, PAGE_ID, UnitID } from './types.ts'
@@ -49,13 +49,23 @@ const tabOptions = [
   { label: '氛围灯效', value: TabType.LED_EFFECT },
 ]
 const currentTab = computed(() => activeTab.value)
-const showTopTabActions = computed(() => currentTab.value !== TabType.LED_EFFECT)
 
 function handleTabChange(value: string | number) {
   activeTab.value = Number(value)
 }
 
-const { settingsForm, keyboardModeOptions, ledModes, ledEffectModes, loadSettings, saveSettings }
+const {
+  settingsForm,
+  keyboardModeOptions,
+  ledModes,
+  ledEffectModes,
+  loadLedEffectSetting,
+  loadLedModeSetting,
+  loadSettings,
+  saveLedEffectSetting,
+  saveLedModeSetting,
+  saveSettings,
+}
   = useSettings({ writeData, writeDataRaw })
 const {
   dialKeyOptions,
@@ -96,10 +106,22 @@ setLoaders({
   loadKeyboardConfigs,
 })
 const loadButtonLabel = computed(() =>
-  currentTab.value === TabType.KEYBOARD ? '读取按键' : currentTab.value === TabType.LED ? '读取LED' : '读取设置',
+  currentTab.value === TabType.KEYBOARD
+    ? '读取按键'
+    : currentTab.value === TabType.LED
+      ? '读取LED'
+      : currentTab.value === TabType.LED_EFFECT
+        ? '读取灯效'
+        : '读取设置',
 )
 const saveButtonLabel = computed(() =>
-  currentTab.value === TabType.KEYBOARD ? '保存按键' : currentTab.value === TabType.LED ? '保存LED' : '保存设置',
+  currentTab.value === TabType.KEYBOARD
+    ? '保存按键'
+    : currentTab.value === TabType.LED
+      ? '保存LED'
+      : currentTab.value === TabType.LED_EFFECT
+        ? '保存灯效'
+        : '保存设置',
 )
 let lightKeyTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -116,10 +138,12 @@ async function loadCurrentTabWithRetry() {
     ? async () => await loadKeyboardConfigs()
     : currentTab.value === TabType.LED
       ? async () => {
-        await loadSettings()
+        await loadLedModeSetting()
         await loadLedGroups()
       }
-      : async () => await loadSettings()
+      : currentTab.value === TabType.LED_EFFECT
+        ? async () => await loadLedEffectSetting()
+        : async () => await loadSettings()
 
   try {
     await task()
@@ -142,10 +166,6 @@ function syncScreenResolution() {
 }
 
 async function handleLoadCurrentTab() {
-  if (currentTab.value === TabType.LED_EFFECT) {
-    return
-  }
-
   await runWithUiBusy(loadButtonLabel.value, async () => {
     await loadCurrentTabWithRetry()
   })
@@ -160,10 +180,6 @@ function notifySaveSuccess(message: string) {
 }
 
 async function handleSaveCurrentTab() {
-  if (currentTab.value === TabType.LED_EFFECT) {
-    return
-  }
-
   await runWithUiBusy(saveButtonLabel.value, async () => {
     if (currentTab.value === TabType.KEYBOARD) {
       await saveKeyboardConfigs()
@@ -173,9 +189,15 @@ async function handleSaveCurrentTab() {
 
     if (currentTab.value === TabType.LED) {
       await saveLedGroups()
-      await saveSettings()
+      await saveLedModeSetting()
       await loadLedGroups()
       notifySaveSuccess('LED 保存成功')
+      return
+    }
+
+    if (currentTab.value === TabType.LED_EFFECT) {
+      await saveLedEffectSetting()
+      notifySaveSuccess('灯效保存成功')
       return
     }
 
@@ -188,7 +210,7 @@ async function handleSaveCurrentTab() {
 onMounted(async () => {
   await runWithUiBusy('初始化设备中，请稍候...', async () => {
     await initializeDevice()
-    if (isConnected.value && currentTab.value === TabType.LED) {
+    if (isConnected.value && (currentTab.value === TabType.LED || currentTab.value === TabType.LED_EFFECT)) {
       await loadCurrentTabWithRetry()
     }
   })
@@ -205,7 +227,7 @@ function getRGBHex(value) {
 async function handleConnectDevice() {
   await runWithUiBusy('连接设备中，请稍候...', async () => {
     await connectDevice()
-    if (currentTab.value === TabType.LED) {
+    if (currentTab.value === TabType.LED || currentTab.value === TabType.LED_EFFECT) {
       await loadCurrentTabWithRetry()
     }
   })
@@ -214,7 +236,7 @@ async function handleConnectDevice() {
 async function handleReloadDevice() {
   await runWithUiBusy('重载设备中，请稍候...', async () => {
     await reloadDevice()
-    if (currentTab.value === TabType.LED) {
+    if (currentTab.value === TabType.LED || currentTab.value === TabType.LED_EFFECT) {
       await loadCurrentTabWithRetry()
     }
   })
@@ -279,7 +301,7 @@ onBeforeUnmount(() => {
     <template v-if="isConnected">
       <TabLayout :model-value="currentTab" :options="tabOptions" horizontal @update:model-value="handleTabChange">
         <template #sidebar>
-          <div v-if="showTopTabActions" style="justify-content: flex-end; padding: 0 4px; gap: 4px" class="flex-rows">
+          <div style="justify-content: flex-end; padding: 0 4px; gap: 4px" class="flex-rows">
             <button class="themed-button" @click="handleLoadCurrentTab">
               {{ loadButtonLabel }}
             </button>
@@ -304,16 +326,15 @@ onBeforeUnmount(() => {
           :standard-key-options="standardKeyOptions" :touch-key-options="touchKeyOptions"
           :update-key-function="updateKeyFunction" @light-key="lightKey" />
 
-        <LedPanel v-if="currentTab === TabType.LED" :led-effect-mode="settingsForm.ledEffectMode"
-          :led-effect-modes="ledEffectModes" :led-groups="ledGroups" :led-mode="settingsForm.ledMode"
+        <LedPanel v-if="currentTab === TabType.LED" :led-groups="ledGroups" :led-mode="settingsForm.ledMode"
           :led-modes="ledModes" :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
           @update-group-brightness="updateLedGroupBrightness" @preview-group="previewLedGroup"
-          @update-group-color="updateLedGroupColor" @update:led-effect-mode="settingsForm.ledEffectMode = $event"
-          @update:led-mode="settingsForm.ledMode = $event" />
+          @update-group-color="updateLedGroupColor" @update:led-mode="settingsForm.ledMode = $event" />
 
         <LedEffectPanel v-if="currentTab === TabType.LED_EFFECT" :effect-preview-options="effectPreviewOptions"
+          :led-effect-mode="settingsForm.ledEffectMode" :led-effect-modes="ledEffectModes"
           :previewing-effect-id="previewingEffectId" @close-preview="closeLedPreview"
-          @preview-effect="startLedEffectPreview" />
+          @preview-effect="startLedEffectPreview" @update:led-effect-mode="settingsForm.ledEffectMode = $event" />
       </TabLayout>
     </template>
 
