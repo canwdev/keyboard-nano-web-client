@@ -76,6 +76,7 @@ const {
   previewingGroupId,
   previewLedGroup,
   saveLedGroups,
+  updateLedGroupBrightness,
   updateLedGroupColor,
 } = useLed({
   writeData,
@@ -275,8 +276,8 @@ onBeforeUnmount(() => {
           v-if="currentTab === TabType.LED" :led-effect-mode="settingsForm.ledEffectMode"
           :led-effect-modes="ledEffectModes" :led-groups="ledGroups" :led-mode="settingsForm.ledMode"
           :led-modes="ledModes" :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
-          @preview-group="previewLedGroup" @update-group-color="updateLedGroupColor"
-          @update:led-effect-mode="settingsForm.ledEffectMode = $event"
+          @update-group-brightness="updateLedGroupBrightness" @preview-group="previewLedGroup"
+          @update-group-color="updateLedGroupColor" @update:led-effect-mode="settingsForm.ledEffectMode = $event"
           @update:led-mode="settingsForm.ledMode = $event"
         />
       </TabLayout>

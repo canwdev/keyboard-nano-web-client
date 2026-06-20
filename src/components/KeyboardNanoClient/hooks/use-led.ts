@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { ActionType, PAGE_ID, UnitID } from '../types.ts'
 
 interface LedHookOptions {
@@ -8,12 +8,14 @@ interface LedHookOptions {
 
 export interface LedGroupConfig {
   colors: [string, string, string]
+  brightness: number
   id: number
   label: string
 }
 
 const LED_GROUP_COUNT = 6
 const LED_COLOR_COUNT = 3
+const AUTO_PREVIEW_DELAY_MS = 180
 
 function wait(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -31,8 +33,24 @@ function toRgbBytes(color: string) {
   }
 }
 
+function clampBrightness(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)))
+}
+
+function applyBrightnessToColor(color: string, brightness: number) {
+  const ratio = clampBrightness(brightness) / 100
+  const { r, g, b } = toRgbBytes(color)
+
+  return {
+    r: Math.round(r * ratio),
+    g: Math.round(g * ratio),
+    b: Math.round(b * ratio),
+  }
+}
+
 function createDefaultLedGroups() {
   return Array.from({ length: LED_GROUP_COUNT }, (_, groupIndex) => ({
+    brightness: 100,
     colors: ['#ffffff', '#ffffff', '#ffffff'] as [string, string, string],
     id: groupIndex + 1,
     label: `灯光组 ${groupIndex + 1}`,
@@ -42,6 +60,55 @@ function createDefaultLedGroups() {
 export function useLed(options: LedHookOptions) {
   const ledGroups = ref<LedGroupConfig[]>(createDefaultLedGroups())
   const previewingGroupId = ref<number | null>(null)
+  let autoPreviewTimer: ReturnType<typeof setTimeout> | undefined
+
+  function clearAutoPreviewTimer() {
+    if (!autoPreviewTimer) {
+      return
+    }
+
+    clearTimeout(autoPreviewTimer)
+    autoPreviewTimer = undefined
+  }
+
+  function getScaledColors(group: LedGroupConfig) {
+    return group.colors.map(color => applyBrightnessToColor(color, group.brightness)) as {
+      b: number
+      g: number
+      r: number
+    }[]
+  }
+
+  async function previewLedGroupNow(groupId: number) {
+    const group = ledGroups.value.find(item => item.id === groupId)
+    if (!group) {
+      return
+    }
+
+    const scaledColors = getScaledColors(group)
+    const data: number[] = [UnitID.LED, 0]
+    scaledColors.forEach(({ r, g, b }) => {
+      data.push(b, r, g)
+    })
+
+    console.log('[led] preview start', {
+      brightness: group.brightness,
+      colors: group.colors,
+      data,
+      groupId,
+      scaledColors,
+    })
+    await options.writeData(ActionType.COMMAND, data)
+    previewingGroupId.value = groupId
+  }
+
+  function scheduleLedPreview(groupId: number) {
+    clearAutoPreviewTimer()
+    autoPreviewTimer = setTimeout(() => {
+      autoPreviewTimer = undefined
+      void previewLedGroupNow(groupId)
+    }, AUTO_PREVIEW_DELAY_MS)
+  }
 
   function updateLedGroupColor(groupId: number, colorIndex: number, value: string) {
     const group = ledGroups.value.find(item => item.id === groupId)
@@ -50,6 +117,17 @@ export function useLed(options: LedHookOptions) {
     }
 
     group.colors[colorIndex] = value
+    scheduleLedPreview(groupId)
+  }
+
+  function updateLedGroupBrightness(groupId: number, value: number) {
+    const group = ledGroups.value.find(item => item.id === groupId)
+    if (!group) {
+      return
+    }
+
+    group.brightness = clampBrightness(value)
+    scheduleLedPreview(groupId)
   }
 
   async function loadLedGroups() {
@@ -61,6 +139,7 @@ export function useLed(options: LedHookOptions) {
     let offset = 4
 
     nextGroups.forEach((group) => {
+      group.brightness = 100
       group.colors = group.colors.map(() => {
         const b = data[offset] ?? 0
         const r = data[offset + 1] ?? 0
@@ -70,6 +149,7 @@ export function useLed(options: LedHookOptions) {
       }) as [string, string, string]
     })
 
+    clearAutoPreviewTimer()
     ledGroups.value = nextGroups
     previewingGroupId.value = null
     console.log('[led] load applied', nextGroups)
@@ -84,8 +164,7 @@ export function useLed(options: LedHookOptions) {
 
     let offset = 4
     ledGroups.value.forEach((group) => {
-      group.colors.forEach((color) => {
-        const { r, g, b } = toRgbBytes(color)
+      getScaledColors(group).forEach(({ r, g, b }) => {
         buffer[offset] = b
         buffer[offset + 1] = r
         buffer[offset + 2] = g
@@ -97,6 +176,7 @@ export function useLed(options: LedHookOptions) {
   }
 
   async function saveLedGroups() {
+    clearAutoPreviewTimer()
     const buffer = buildLedWriteBuffer()
     console.log('[led] save request', {
       groups: ledGroups.value,
@@ -109,27 +189,12 @@ export function useLed(options: LedHookOptions) {
   }
 
   async function previewLedGroup(groupId: number) {
-    const group = ledGroups.value.find(item => item.id === groupId)
-    if (!group) {
-      return
-    }
-
-    const data: number[] = [UnitID.LED, 0]
-    group.colors.forEach((color) => {
-      const { r, g, b } = toRgbBytes(color)
-      data.push(b, r, g)
-    })
-
-    console.log('[led] preview start', {
-      groupId,
-      colors: group.colors,
-      data,
-    })
-    await options.writeData(ActionType.COMMAND, data)
-    previewingGroupId.value = groupId
+    clearAutoPreviewTimer()
+    await previewLedGroupNow(groupId)
   }
 
   async function closeLedPreview() {
+    clearAutoPreviewTimer()
     const data = [UnitID.LED, 0]
     for (let index = 0; index < LED_COLOR_COUNT; index += 1) {
       data.push(0, 0, 0)
@@ -140,6 +205,10 @@ export function useLed(options: LedHookOptions) {
     previewingGroupId.value = null
   }
 
+  onBeforeUnmount(() => {
+    clearAutoPreviewTimer()
+  })
+
   return {
     closeLedPreview,
     ledGroups,
@@ -147,6 +216,7 @@ export function useLed(options: LedHookOptions) {
     previewingGroupId,
     previewLedGroup,
     saveLedGroups,
+    updateLedGroupBrightness,
     updateLedGroupColor,
   }
 }

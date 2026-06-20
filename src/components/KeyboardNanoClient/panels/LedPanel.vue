@@ -33,6 +33,7 @@ const props = defineProps({
 const emit = defineEmits<{
   'closePreview': []
   'previewGroup': [groupId: number]
+  'updateGroupBrightness': [groupId: number, value: number]
   'updateGroupColor': [groupId: number, colorIndex: number, value: string]
   'update:ledEffectMode': [value: number]
   'update:ledMode': [value: number]
@@ -86,6 +87,7 @@ const emit = defineEmits<{
         <LedGroupCard
           v-for="group in props.ledGroups" :key="group.id" :group="group"
           :is-previewing="props.previewingGroupId === group.id" @preview="emit('previewGroup', $event)"
+          @update-brightness="emit('updateGroupBrightness', $event.groupId, $event.value)"
           @update-color="emit('updateGroupColor', $event.groupId, $event.colorIndex, $event.value)"
         />
       </div>
