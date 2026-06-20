@@ -1,6 +1,8 @@
 import type { INotification } from './components/CommonUI/NotificationList/notification-list'
 
 declare global {
+  const __APP_VERSION__: string
+
   interface HIDCollectionInfo {
     usagePage: number
     usage: number

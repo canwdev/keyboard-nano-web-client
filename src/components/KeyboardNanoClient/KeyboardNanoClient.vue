@@ -4,14 +4,19 @@ import { useStorage } from '@vueuse/core'
 import { computed, onMounted, ref } from 'vue'
 import { keyboardNanoApi } from '../../utils/api.ts'
 import TabLayout from '../CommonUI/TabLayout.vue'
-import { mainJson } from './data/index.ts'
 import { useKeyboard } from './hooks/use-keyboard.ts'
 import { useSettings } from './hooks/use-settings.ts'
+import DeviceInfoPanel from './panels/DeviceInfoPanel.vue'
+import DeviceListPanel from './panels/DeviceListPanel.vue'
+import KeyboardPanel from './panels/KeyboardPanel.vue'
+import LedPanel from './panels/LedPanel.vue'
+import SettingsPanel from './panels/SettingsPanel.vue'
 import { ActionType, PAGE_ID, UnitID } from './types.ts'
 
 const vendorId = ref('')
 const usagePage = ref('')
 const isConnected = ref(false)
+const appVersion = __APP_VERSION__
 
 enum TabType {
   SETTINGS = 0,
@@ -188,6 +193,11 @@ function getRGBHex(value) {
   }
 }
 const colorList = ref(['#ff0000', '#00ff00', '#0000ff'])
+
+function updateColor(index: number, value: string) {
+  colorList.value[index] = value
+}
+
 async function testColor() {
   const data: any[] = [UnitID.LED, 0]
   // data[4] = 0x00  // 1-B
@@ -245,55 +255,11 @@ async function lightKey(index: number) {
 
 <template>
   <div class="keyboard-nano-client">
-    <fieldset>
-      <legend>设备信息</legend>
-
-      <div class="flex-cols">
-        <div class="flex-rows">
-          <label>
-            vendorId
-            <input v-model="vendorId" class="themed-input" :disabled="isConnected" type="text">
-          </label>
-          <label>
-            usagePage
-            <input v-model="usagePage" class="themed-input" :disabled="isConnected" type="text">
-          </label>
-        </div>
-
-        <div class="flex-rows">
-          <a href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md" target="_blank">
-            通信协议
-          </a>
-
-          <a href="https://github.com/canwdev/keyboard-nano-web-client" target="_blank">Github</a>
-        </div>
-
-        <div class="flex-rows" style="justify-content: flex-end">
-          <button class="themed-button" @click="getStatus">
-            刷新信息
-          </button>
-          <template v-if="!isConnected">
-            <button class="themed-button green" @click="connectDevice">
-              连接设备
-            </button>
-          </template>
-          <template v-else>
-            <button class="themed-button" @click="sendPing">
-              Ping
-            </button>
-            <button class="themed-button yellow" @click="reloadDevice">
-              重载配置
-            </button>
-            <button class="themed-button yellow" @click="resetDevice">
-              复位设备
-            </button>
-            <button class="themed-button red" @click="closeDevice">
-              关闭连接
-            </button>
-          </template>
-        </div>
-      </div>
-    </fieldset>
+    <DeviceInfoPanel
+      :app-version="appVersion" :is-connected="isConnected" :usage-page="usagePage" :vendor-id="vendorId"
+      @close="closeDevice" @connect="connectDevice" @ping="sendPing" @refresh="getStatus" @reload="reloadDevice"
+      @reset="resetDevice" @update:usage-page="usagePage = $event" @update:vendor-id="vendorId = $event"
+    />
 
     <template v-if="isConnected">
       <TabLayout :model-value="currentTab" :options="tabOptions" horizontal @update:model-value="handleTabChange">
@@ -308,243 +274,33 @@ async function lightKey(index: number) {
           </div>
         </template>
 
-        <div v-if="currentTab === TabType.SETTINGS">
-          <div class="flex-cols">
-            <fieldset>
-              <legend>预设模式</legend>
-              <div class="flex-rows preset-mode-list">
-                <label v-for="(item, index) in keyboardModes" :key="index">
-                  <input v-model="settingsForm.keyboardMode" type="radio" :value="index">
-                  {{ item }}
-                </label>
-              </div>
-            </fieldset>
+        <SettingsPanel
+          v-if="currentTab === TabType.SETTINGS" :keyboard-l-p="settingsForm.keyboardLP"
+          :keyboard-mode="settingsForm.keyboardMode" :keyboard-modes="keyboardModes"
+          :keyboard-scan-s-p="settingsForm.keyboardScanSP" :resolution-x="settingsForm.resolutionX"
+          :resolution-y="settingsForm.resolutionY" @update:keyboard-l-p="settingsForm.keyboardLP = $event"
+          @update:keyboard-mode="settingsForm.keyboardMode = $event"
+          @update:keyboard-scan-s-p="settingsForm.keyboardScanSP = $event"
+        />
 
-            <fieldset>
-              <legend>功能</legend>
-              <div>按键扫描间隔: <input v-model="settingsForm.keyboardScanSP" type="number"></div>
-              <div>长按识别间隔: <input v-model="settingsForm.keyboardLP" type="number"></div>
-              <div>屏幕分辨率: {{ settingsForm.resolutionX }} x {{ settingsForm.resolutionY }}</div>
-            </fieldset>
-          </div>
-        </div>
+        <KeyboardPanel
+          v-if="currentTab === TabType.KEYBOARD" :dial-key-options="dialKeyOptions"
+          :keyboard-list="keyboardList" :media-key-options="mediaKeyOptions" :mouse-button-options="mouseButtonOptions"
+          :standard-key-options="standardKeyOptions" :touch-key-options="touchKeyOptions"
+          :update-key-function="updateKeyFunction" @light-key="lightKey"
+        />
 
-        <div v-if="currentTab === TabType.KEYBOARD">
-          <div class="flex-rows keyboard-list">
-            <div v-for="item in keyboardList" :key="item.id" class="keyboard-item">
-              <button class="themed-button btn-keyboard" @click="lightKey(item.id)">
-                点亮 {{ item.id }} 键
-              </button>
-
-              <div class="flex-cols keyboard-config">
-                <label class="keyboard-field">
-                  <span>功能</span>
-                  <select
-                    :value="item.functionIndex"
-                    @change="updateKeyFunction(item, Number(($event.target as HTMLSelectElement).value))"
-                  >
-                    <option v-for="(func, index) in mainJson.key_func_list" :key="index" :value="index">
-                      {{ func }}
-                    </option>
-                  </select>
-                </label>
-
-                <template v-if="item.functionIndex === 0">
-                  <label class="keyboard-field">
-                    <span>标准按键</span>
-                    <select v-model="item.standardKey">
-                      <option value="">
-                        未设置
-                      </option>
-                      <option v-for="keyName in standardKeyOptions" :key="keyName" :value="keyName">
-                        {{ keyName }}
-                      </option>
-                    </select>
-                  </label>
-
-                  <div class="keyboard-modifiers">
-                    <label><input v-model="item.modifiers.ctrl" type="checkbox">Ctrl</label>
-                    <label><input v-model="item.modifiers.shift" type="checkbox">Shift</label>
-                    <label><input v-model="item.modifiers.alt" type="checkbox">Alt</label>
-                    <label><input v-model="item.modifiers.meta" type="checkbox">Meta</label>
-                  </div>
-                </template>
-
-                <label v-if="item.functionIndex === 1" class="keyboard-field">
-                  <span>多媒体动作</span>
-                  <select v-model="item.mediaKey">
-                    <option v-for="name in mediaKeyOptions" :key="name" :value="name">
-                      {{ name }}
-                    </option>
-                  </select>
-                </label>
-
-                <template v-if="item.functionIndex === 2">
-                  <label class="keyboard-field">
-                    <span>鼠标按键</span>
-                    <select v-model="item.mouseButton">
-                      <option v-for="(name, index) in mouseButtonOptions" :key="name" :value="index">
-                        {{ name }}
-                      </option>
-                    </select>
-                  </label>
-                  <div class="keyboard-inline-fields">
-                    <label class="keyboard-field">
-                      <span>X</span>
-                      <input v-model="item.mouseX" type="number">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>Y</span>
-                      <input v-model="item.mouseY" type="number">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>滚轮</span>
-                      <input v-model="item.mouseScroll" type="number">
-                    </label>
-                  </div>
-                </template>
-
-                <template v-if="item.functionIndex === 3">
-                  <label class="keyboard-field">
-                    <span>触摸动作</span>
-                    <select v-model="item.touchGesture">
-                      <option v-for="name in touchKeyOptions" :key="name" :value="mainJson.touch_key_list[name]">
-                        {{ name }}
-                      </option>
-                    </select>
-                  </label>
-
-                  <div v-if="item.touchGesture <= 3" class="keyboard-inline-fields">
-                    <label class="keyboard-field">
-                      <span>滑动距离</span>
-                      <input v-model="item.touchSlidePx" type="number">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>滑动时长(ms)</span>
-                      <input v-model="item.touchSlideMs" type="number">
-                    </label>
-                  </div>
-
-                  <div v-if="item.touchGesture === 4" class="keyboard-inline-fields">
-                    <label class="keyboard-field">
-                      <span>边数</span>
-                      <input v-model="item.touchOsuN" type="number" min="1">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>半径</span>
-                      <input v-model="item.touchOsuR" type="number" min="1">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>单圈时间(ms)</span>
-                      <input v-model="item.touchOsuFinishMs" type="number" min="1">
-                    </label>
-                  </div>
-
-                  <div v-if="item.touchGesture === 5" class="keyboard-inline-fields">
-                    <label class="keyboard-field">
-                      <span>X</span>
-                      <input v-model="item.touchMouseX" type="number" min="0">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>Y</span>
-                      <input v-model="item.touchMouseY" type="number" min="0">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>按压时长(ms)</span>
-                      <input v-model="item.touchMouseMs" type="number" min="0">
-                    </label>
-                  </div>
-                </template>
-
-                <template v-if="item.functionIndex === 4">
-                  <label class="keyboard-field">
-                    <span>滚轮动作</span>
-                    <select v-model="item.dialAction">
-                      <option v-for="name in dialKeyOptions" :key="name" :value="mainJson.dial_key_list[name]">
-                        {{ name }}
-                      </option>
-                    </select>
-                  </label>
-
-                  <div class="keyboard-inline-fields">
-                    <label class="keyboard-field">
-                      <span>滚动格数</span>
-                      <input v-model="item.dialScroll" type="number" min="0" step="0.1">
-                    </label>
-                    <label class="keyboard-field">
-                      <span>延迟(ms)</span>
-                      <input v-model="item.dialDelay" type="number" min="0">
-                    </label>
-                  </div>
-
-                  <label class="keyboard-checkbox">
-                    <input v-model="item.dialScrollEnable" type="checkbox">
-                    启用滚动增强
-                  </label>
-                </template>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="currentTab === TabType.LED">
-          <fieldset>
-            <legend>LED设置</legend>
-
-            <div class="flex-cols">
-              <label>
-                灯光组：
-                <select v-model="settingsForm.ledMode">
-                  <option v-for="(item, index) in ledModes" :key="index" :value="index">
-                    {{ item }}
-                  </option>
-                </select>
-              </label>
-              <label>
-                灯效：
-                <select v-model="settingsForm.ledEffectMode">
-                  <option v-for="(item, index) in ledEffectModes" :key="index" :value="index">
-                    {{ item }}
-                  </option>
-                </select>
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>LED 测试</legend>
-
-            <div class="flex-cols">
-              仅用于测试LED功能，设置不会保存，点击[重载配置]还原。
-
-              <div class="flex-rows">
-                <input v-for="(item, index) in colorList" :key="index" v-model="colorList[index]" type="color">
-              </div>
-              <div class="flex-rows">
-                <button class="themed-button" @click="testColor">
-                  测试
-                </button>
-              </div>
-            </div>
-          </fieldset>
-        </div>
+        <LedPanel
+          v-if="currentTab === TabType.LED" :color-list="colorList"
+          :led-effect-mode="settingsForm.ledEffectMode" :led-effect-modes="ledEffectModes"
+          :led-mode="settingsForm.ledMode" :led-modes="ledModes" @test-color="testColor" @update-color="updateColor"
+          @update:led-effect-mode="settingsForm.ledEffectMode = $event"
+          @update:led-mode="settingsForm.ledMode = $event"
+        />
       </TabLayout>
     </template>
 
-    <fieldset>
-      <legend>HID Devices</legend>
-      <div class="device-list">
-        <details v-for="(item, key) of deviceListGroupByProduct" :key="key">
-          <summary>{{ key }}</summary>
-          <ul
-            v-for="v in item" :key="v.path"
-            :class="{ active: v.vendorId === Number(vendorId) && v.usagePage === Number(usagePage) }"
-          >
-            <li>{{ v }}</li>
-          </ul>
-        </details>
-      </div>
-    </fieldset>
+    <DeviceListPanel :device-groups="deviceListGroupByProduct" :usage-page="usagePage" :vendor-id="vendorId" />
   </div>
 </template>
 
@@ -556,86 +312,6 @@ async function lightKey(index: number) {
   .mc-vertical-tab-layout {
     margin-top: 16px;
     margin-bottom: 16px;
-  }
-
-  .preset-mode-list {
-    display: grid;
-    grid-template-rows: repeat(5, 1fr);
-    /* 定义 5 行 */
-    grid-template-columns: auto;
-    /* 列宽度自动调整 */
-    grid-auto-flow: column;
-    /* 项目按列排列，即纵向排列 */
-    gap: 4px;
-  }
-
-  .keyboard-list {
-    align-items: stretch;
-
-    .keyboard-item {
-      flex: 1;
-      padding: 4px 8px;
-      border: 1px solid #9c9c9c33;
-      border-radius: 4px;
-      margin-bottom: 4px;
-      text-align: center;
-      display: flex;
-      align-items: center;
-      flex-direction: column;
-      gap: 10px;
-
-      .btn-keyboard {
-        width: 64px;
-        height: 64px;
-        font-size: 12px;
-      }
-    }
-  }
-
-  .keyboard-config {
-    width: 100%;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .keyboard-field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    text-align: left;
-
-    select,
-    input {
-      width: 100%;
-    }
-  }
-
-  .keyboard-inline-fields {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .keyboard-modifiers {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-  }
-
-  .keyboard-checkbox {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  .device-list {
-    overflow-y: auto;
-  }
-
-  .active {
-    color: red;
   }
 }
 </style>
