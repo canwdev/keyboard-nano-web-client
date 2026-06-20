@@ -50,10 +50,8 @@ const emit = defineEmits<{
         <div class="flex-cols keyboard-config">
           <label class="keyboard-field">
             <span>功能</span>
-            <select
-              :value="item.functionIndex"
-              @change="props.updateKeyFunction(item, Number(($event.target as HTMLSelectElement).value))"
-            >
+            <select :value="item.functionIndex"
+              @change="props.updateKeyFunction(item, Number(($event.target as HTMLSelectElement).value))">
               <option v-for="(func, index) in mainJson.key_func_list" :key="index" :value="index">
                 {{ func }}
               </option>
@@ -214,7 +212,7 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
 
 .btn-keyboard {

@@ -25,7 +25,7 @@ const globalOverlayMessage = computed(() => {
 
 <template>
   <transition name="fade">
-    <div v-show="isGlobalOverlayVisible" class="loading-layer">
+    <div v-show="isGlobalOverlayVisible" class="loading-layer" @click="stopPreviewFromOverlay">
       <div class="loading-card">
         <div v-if="!isPreviewLockActive" class="loading-spinner" />
         <div>{{ globalOverlayMessage }}</div>

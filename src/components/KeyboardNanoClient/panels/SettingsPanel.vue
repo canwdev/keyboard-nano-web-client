@@ -50,14 +50,9 @@ const emit = defineEmits<{
       <fieldset>
         <legend>预设模式</legend>
         <div class="flex-rows preset-mode-list">
-          <label
-            v-for="(item, index) in props.keyboardModeOptions" :key="index" class="preset-mode-option"
-            :title="item.tooltip"
-          >
-            <input
-              :checked="props.keyboardMode === index" type="radio" :value="index"
-              @change="emit('update:keyboardMode', index)"
-            >
+          <label v-for="(item, index) in props.keyboardModeOptions" :key="index" class="preset-mode-option">
+            <input :checked="props.keyboardMode === index" type="radio" :value="index"
+              @change="emit('update:keyboardMode', index)">
             <span>{{ item.label }}</span>
             <span class="preset-mode-option__tooltip">{{ item.tooltip }}</span>
           </label>
@@ -68,20 +63,16 @@ const emit = defineEmits<{
         <legend>功能</legend>
         <div class="settings-feature-panel">
           <label class="settings-feature-panel__checkbox" title="灯光总开关">
-            <input
-              :checked="props.ledMode > 0" type="checkbox"
-              @change="emit('update:ledMode', ($event.target as HTMLInputElement).checked ? (props.ledMode || 1) : 0)"
-            >
+            <input :checked="props.ledMode > 0" type="checkbox"
+              @change="emit('update:ledMode', ($event.target as HTMLInputElement).checked ? (props.ledMode || 1) : 0)">
             灯光总开关(启用RGB)
           </label>
 
           <label class="settings-feature-panel__row" title="按键扫描间隔过短可能导致连击">
             <span>按键扫描间隔:</span>
             <div class="settings-feature-panel__control">
-              <input
-                :value="props.keyboardScanSP" type="number" min="1" max="255"
-                @input="emit('update:keyboardScanSP', Number(($event.target as HTMLInputElement).value))"
-              >
+              <input :value="props.keyboardScanSP" type="number" min="1" max="255"
+                @input="emit('update:keyboardScanSP', Number(($event.target as HTMLInputElement).value))">
               <span>ms</span>
             </div>
           </label>
@@ -89,10 +80,8 @@ const emit = defineEmits<{
           <label class="settings-feature-panel__row">
             <span>长按识别间隔:</span>
             <div class="settings-feature-panel__control">
-              <input
-                :value="props.keyboardLP" type="number" min="100" max="10000" step="100"
-                @input="emit('update:keyboardLP', Number(($event.target as HTMLInputElement).value))"
-              >
+              <input :value="props.keyboardLP" type="number" min="100" max="10000" step="100"
+                @input="emit('update:keyboardLP', Number(($event.target as HTMLInputElement).value))">
               <span>ms</span>
             </div>
           </label>
@@ -100,15 +89,11 @@ const emit = defineEmits<{
           <label class="settings-feature-panel__row" title="用于设置触摸屏">
             <span>屏幕分辨率:</span>
             <div class="settings-feature-panel__resolution">
-              <input
-                :value="props.resolutionX" type="number" min="50" max="4000"
-                @input="emit('update:resolutionX', Number(($event.target as HTMLInputElement).value))"
-              >
+              <input :value="props.resolutionX" type="number" min="50" max="4000"
+                @input="emit('update:resolutionX', Number(($event.target as HTMLInputElement).value))">
               <span>*</span>
-              <input
-                :value="props.resolutionY" type="number" min="50" max="4000"
-                @input="emit('update:resolutionY', Number(($event.target as HTMLInputElement).value))"
-              >
+              <input :value="props.resolutionY" type="number" min="50" max="4000"
+                @input="emit('update:resolutionY', Number(($event.target as HTMLInputElement).value))">
             </div>
           </label>
 

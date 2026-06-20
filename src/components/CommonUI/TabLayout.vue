@@ -52,14 +52,8 @@ export default defineComponent({
   <div class="mc-vertical-tab-layout vp-bg" :class="{ horizontal }">
     <div class="sidebar-wrap">
       <div class="mc-tab-list">
-        <div
-          v-for="item in options"
-          :key="item.value"
-          :class="{ active: isActive(item.value) }"
-          class="list-item"
-          :title="item.title"
-          @click="selectTab(item.value)"
-        >
+        <div v-for="item in options" :key="item.value" :class="{ active: isActive(item.value) }" class="list-item"
+          :title="item.title" @click="selectTab(item.value)">
           <div v-if="item.label" class="item-text">
             {{ item.label }}
           </div>
@@ -98,6 +92,7 @@ export default defineComponent({
     .mc-tab-list {
       overflow: hidden;
       flex: 1;
+
       .list-item {
         padding: 4px 8px;
         transition: background-color 0.3s;
@@ -113,8 +108,7 @@ export default defineComponent({
           color: white;
         }
 
-        .item-text {
-        }
+        .item-text {}
       }
     }
   }
@@ -129,8 +123,10 @@ export default defineComponent({
       height: auto;
       overflow: hidden;
       width: 100%;
+
       .mc-tab-list {
         display: flex;
+
         .list-item {
           flex-shrink: 0;
           display: flex;
@@ -139,10 +135,12 @@ export default defineComponent({
         }
       }
     }
+
     .content-wrap {
       width: 100%;
       padding: 10px;
       border: 1px solid $color_border;
+      border-radius: 0 0 5px 5px;
     }
   }
 
