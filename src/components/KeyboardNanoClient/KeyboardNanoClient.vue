@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { keyboardNanoApi } from '../../utils/api.ts'
 import TabLayout from '../CommonUI/TabLayout.vue'
 import { mainJson } from './data/index.ts'
+import { useKeyboard } from './hooks/use-keyboard.ts'
 import { useSettings } from './hooks/use-settings.ts'
 import { ActionType, PAGE_ID, UnitID } from './types.ts'
 
@@ -32,15 +33,27 @@ function handleTabChange(value: string | number) {
 
 const { settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, saveSettings }
   = useSettings({ writeData, writeDataRaw })
-
-const keyboardList = computed(() => {
-  return [{ id: 0 }, { id: 1 }, { id: 2 }].map((item) => {
-    return {
-      ...item,
-      keyFunc: 0,
-    }
-  })
+const {
+  dialKeyOptions,
+  keyboardList,
+  loadKeyboardConfigs,
+  mediaKeyOptions,
+  mouseButtonOptions,
+  saveKeyboardConfigs,
+  standardKeyOptions,
+  touchKeyOptions,
+  updateKeyFunction,
+} = useKeyboard({
+  writeData,
+  writeDataRaw,
+  getResolution: () => ({
+    x: settingsForm.resolutionX,
+    y: settingsForm.resolutionY,
+  }),
 })
+const loadButtonLabel = computed(() => currentTab.value === TabType.KEYBOARD ? '读取按键' : '读取设置')
+const saveButtonLabel = computed(() => currentTab.value === TabType.KEYBOARD ? '保存按键' : '保存设置')
+const wait = async (ms: number) => await new Promise(resolve => setTimeout(resolve, ms))
 
 async function connectDevice() {
   await keyboardNanoApi.deviceInit({
@@ -48,11 +61,19 @@ async function connectDevice() {
     usage_page: usagePage.value,
   })
   await loadSettings()
+  await loadKeyboardConfigs()
   await getStatus()
 }
 
 async function reloadDevice() {
+  console.log('[page] reloadDevice start')
   await writeData(ActionType.RELOAD)
+  console.log('[page] reloadDevice wait before refresh', { waitMs: 600 })
+  await wait(600)
+  console.log('[page] reloadDevice refresh start')
+  await loadSettings()
+  await loadKeyboardConfigs()
+  console.log('[page] reloadDevice finished')
 }
 
 async function resetDevice() {
@@ -70,6 +91,10 @@ async function closeDevice() {
 }
 
 async function writeDataRaw(buffer: any[] = [], isRead = false) {
+  console.log('[page] writeDataRaw', {
+    isRead,
+    buffer,
+  })
   return await keyboardNanoApi.write({
     buffer,
     isRead,
@@ -84,6 +109,12 @@ async function writeData(action: ActionType, extraData: any[] = [], isRead = fal
   if (extraData) {
     buffer = [...buffer, ...extraData]
   }
+  console.log('[page] writeData', {
+    action,
+    extraData,
+    isRead,
+    buffer,
+  })
   return await writeDataRaw(buffer, isRead)
 }
 
@@ -121,10 +152,30 @@ async function getStatus() {
   deviceList.value = res.devices
 }
 
+async function handleLoadCurrentTab() {
+  if (currentTab.value === TabType.KEYBOARD) {
+    await loadKeyboardConfigs()
+    return
+  }
+
+  await loadSettings()
+}
+
+async function handleSaveCurrentTab() {
+  if (currentTab.value === TabType.KEYBOARD) {
+    await saveKeyboardConfigs()
+    return
+  }
+
+  await saveSettings()
+  await loadKeyboardConfigs()
+}
+
 onMounted(async () => {
   await getStatus()
   if (isConnected.value) {
     await loadSettings()
+    await loadKeyboardConfigs()
   }
 })
 
@@ -248,11 +299,11 @@ async function lightKey(index: number) {
       <TabLayout :model-value="currentTab" :options="tabOptions" horizontal @update:model-value="handleTabChange">
         <template #sidebar>
           <div style="justify-content: flex-end; padding: 0 4px; gap: 4px" class="flex-rows">
-            <button class="themed-button" @click="loadSettings">
-              读取设置
+            <button class="themed-button" @click="handleLoadCurrentTab">
+              {{ loadButtonLabel }}
             </button>
-            <button class="themed-button blue" @click="saveSettings">
-              保存设置
+            <button class="themed-button blue" @click="handleSaveCurrentTab">
+              {{ saveButtonLabel }}
             </button>
           </div>
         </template>
@@ -285,12 +336,152 @@ async function lightKey(index: number) {
                 点亮 {{ item.id }} 键
               </button>
 
-              <div class="flex-rows">
-                <select v-model="item.keyFunc">
-                  <option v-for="(func, index) in mainJson.key_func_list" :key="index" :value="index">
-                    {{ func }}
-                  </option>
-                </select>
+              <div class="flex-cols keyboard-config">
+                <label class="keyboard-field">
+                  <span>功能</span>
+                  <select
+                    :value="item.functionIndex"
+                    @change="updateKeyFunction(item, Number(($event.target as HTMLSelectElement).value))"
+                  >
+                    <option v-for="(func, index) in mainJson.key_func_list" :key="index" :value="index">
+                      {{ func }}
+                    </option>
+                  </select>
+                </label>
+
+                <template v-if="item.functionIndex === 0">
+                  <label class="keyboard-field">
+                    <span>标准按键</span>
+                    <select v-model="item.standardKey">
+                      <option value="">
+                        未设置
+                      </option>
+                      <option v-for="keyName in standardKeyOptions" :key="keyName" :value="keyName">
+                        {{ keyName }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <div class="keyboard-modifiers">
+                    <label><input v-model="item.modifiers.ctrl" type="checkbox">Ctrl</label>
+                    <label><input v-model="item.modifiers.shift" type="checkbox">Shift</label>
+                    <label><input v-model="item.modifiers.alt" type="checkbox">Alt</label>
+                    <label><input v-model="item.modifiers.meta" type="checkbox">Meta</label>
+                  </div>
+                </template>
+
+                <label v-if="item.functionIndex === 1" class="keyboard-field">
+                  <span>多媒体动作</span>
+                  <select v-model="item.mediaKey">
+                    <option v-for="name in mediaKeyOptions" :key="name" :value="name">
+                      {{ name }}
+                    </option>
+                  </select>
+                </label>
+
+                <template v-if="item.functionIndex === 2">
+                  <label class="keyboard-field">
+                    <span>鼠标按键</span>
+                    <select v-model="item.mouseButton">
+                      <option v-for="(name, index) in mouseButtonOptions" :key="name" :value="index">
+                        {{ name }}
+                      </option>
+                    </select>
+                  </label>
+                  <div class="keyboard-inline-fields">
+                    <label class="keyboard-field">
+                      <span>X</span>
+                      <input v-model="item.mouseX" type="number">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>Y</span>
+                      <input v-model="item.mouseY" type="number">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>滚轮</span>
+                      <input v-model="item.mouseScroll" type="number">
+                    </label>
+                  </div>
+                </template>
+
+                <template v-if="item.functionIndex === 3">
+                  <label class="keyboard-field">
+                    <span>触摸动作</span>
+                    <select v-model="item.touchGesture">
+                      <option v-for="name in touchKeyOptions" :key="name" :value="mainJson.touch_key_list[name]">
+                        {{ name }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <div v-if="item.touchGesture <= 3" class="keyboard-inline-fields">
+                    <label class="keyboard-field">
+                      <span>滑动距离</span>
+                      <input v-model="item.touchSlidePx" type="number">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>滑动时长(ms)</span>
+                      <input v-model="item.touchSlideMs" type="number">
+                    </label>
+                  </div>
+
+                  <div v-if="item.touchGesture === 4" class="keyboard-inline-fields">
+                    <label class="keyboard-field">
+                      <span>边数</span>
+                      <input v-model="item.touchOsuN" type="number" min="1">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>半径</span>
+                      <input v-model="item.touchOsuR" type="number" min="1">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>单圈时间(ms)</span>
+                      <input v-model="item.touchOsuFinishMs" type="number" min="1">
+                    </label>
+                  </div>
+
+                  <div v-if="item.touchGesture === 5" class="keyboard-inline-fields">
+                    <label class="keyboard-field">
+                      <span>X</span>
+                      <input v-model="item.touchMouseX" type="number" min="0">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>Y</span>
+                      <input v-model="item.touchMouseY" type="number" min="0">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>按压时长(ms)</span>
+                      <input v-model="item.touchMouseMs" type="number" min="0">
+                    </label>
+                  </div>
+                </template>
+
+                <template v-if="item.functionIndex === 4">
+                  <label class="keyboard-field">
+                    <span>滚轮动作</span>
+                    <select v-model="item.dialAction">
+                      <option v-for="name in dialKeyOptions" :key="name" :value="mainJson.dial_key_list[name]">
+                        {{ name }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <div class="keyboard-inline-fields">
+                    <label class="keyboard-field">
+                      <span>滚动格数</span>
+                      <input v-model="item.dialScroll" type="number" min="0" step="0.1">
+                    </label>
+                    <label class="keyboard-field">
+                      <span>延迟(ms)</span>
+                      <input v-model="item.dialDelay" type="number" min="0">
+                    </label>
+                  </div>
+
+                  <label class="keyboard-checkbox">
+                    <input v-model="item.dialScrollEnable" type="checkbox">
+                    启用滚动增强
+                  </label>
+                </template>
               </div>
             </div>
           </div>
@@ -379,6 +570,8 @@ async function lightKey(index: number) {
   }
 
   .keyboard-list {
+    align-items: stretch;
+
     .keyboard-item {
       flex: 1;
       padding: 4px 8px;
@@ -397,6 +590,44 @@ async function lightKey(index: number) {
         font-size: 12px;
       }
     }
+  }
+
+  .keyboard-config {
+    width: 100%;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .keyboard-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+
+    select,
+    input {
+      width: 100%;
+    }
+  }
+
+  .keyboard-inline-fields {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .keyboard-modifiers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .keyboard-checkbox {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
   }
 
   .device-list {

@@ -1,7 +1,10 @@
 import { reactive } from 'vue'
+import { mainJson } from '../data/index.ts'
 import { ActionType, PAGE_ID, UnitID } from '../types.ts'
 
 export function useSettings({ writeData, writeDataRaw }) {
+  const wait = async (ms: number) => await new Promise(resolve => setTimeout(resolve, ms))
+
   const settingsForm = reactive({
     keyboardMode: 0,
     ledMode: 0,
@@ -34,7 +37,7 @@ export function useSettings({ writeData, writeDataRaw }) {
     '页面导航',
   ]
 
-  const ledModes = ['灯光组 1', '灯光组 2', '灯光组 3', '灯光组 4', '灯光组 5', '灯光组 6']
+  const ledModes = ['关闭', '灯光组 1', '灯光组 2', '灯光组 3', '灯光组 4', '灯光组 5', '灯光组 6']
 
   const ledEffectModes = [
     '关闭',
@@ -45,7 +48,9 @@ export function useSettings({ writeData, writeDataRaw }) {
   ]
 
   const loadSettings = async () => {
-    const { data } = await writeData(ActionType.READ, [UnitID.ALL, 0, 0], true)
+    console.log('[settings] load start')
+    const { data } = await writeData(ActionType.READ, [UnitID.FUNC, 0, 0], true)
+    console.log('[settings] load response', data)
 
     settingsForm.keyboardMode = data[4]
     settingsForm.ledMode = data[7]
@@ -56,6 +61,7 @@ export function useSettings({ writeData, writeDataRaw }) {
     settingsForm.resolutionY = Number.parseInt(data[14] * 255 + data[13])
 
     settingsForm.ledEffectMode = data[15]
+    console.log('[settings] load applied', { ...settingsForm })
   }
 
   const saveSettings = async () => {
@@ -78,7 +84,45 @@ export function useSettings({ writeData, writeDataRaw }) {
 
     buffer[15] = settingsForm.ledEffectMode
 
+    console.log('[settings] save request', {
+      settings: { ...settingsForm },
+      buffer,
+    })
+
+    if (settingsForm.keyboardMode !== 0) {
+      const presetGroups = mainJson.keyboard_mode_group[String(settingsForm.keyboardMode)] ?? []
+      console.log('[settings] preset apply start', {
+        keyboardMode: settingsForm.keyboardMode,
+        presetGroups,
+      })
+
+      for (const [index, presetBuffer] of presetGroups.entries()) {
+        console.log('[settings] preset apply item', {
+          index,
+          presetBuffer,
+        })
+        await writeDataRaw([...presetBuffer])
+        console.log('[settings] preset apply item finished, wait before next', {
+          index,
+          waitMs: 600,
+        })
+        await wait(600)
+      }
+
+      console.log('[settings] preset apply finished, reload before settings write')
+      await writeData(ActionType.RELOAD)
+      console.log('[settings] preset reload finished, wait before settings write')
+      await wait(300)
+    }
+
     await writeDataRaw(buffer)
+    console.log('[settings] save write finished, wait before reload')
+    await wait(1000)
+    console.log('[settings] save reload request')
+    await writeData(ActionType.RELOAD)
+    console.log('[settings] save reload finished, wait before load')
+    await wait(300)
+    console.log('[settings] save load start')
     await loadSettings()
   }
 

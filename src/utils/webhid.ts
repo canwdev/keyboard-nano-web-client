@@ -10,6 +10,15 @@ let usagePageState = DEFAULT_USAGE_PAGE
 let allowAutoRestore = true
 let operationQueue = Promise.resolve()
 
+function logWebHid(message: string, payload?: unknown) {
+  if (payload === undefined) {
+    console.log(`[webhid] ${message}`)
+    return
+  }
+
+  console.log(`[webhid] ${message}`, payload)
+}
+
 function ensureWebHidSupport() {
   if (!('hid' in navigator)) {
     throw new Error('当前浏览器不支持 WebHID，请使用桌面版 Chrome / Edge。')
@@ -74,17 +83,33 @@ function mapDevice(device: HIDDevice): HidDevice {
 
 async function ensureDeviceOpen(device: HIDDevice) {
   if (!device.opened) {
+    logWebHid('open device', {
+      device: toDeviceKey(device),
+    })
     await device.open()
   }
 }
 
 async function getGrantedDevices() {
   ensureWebHidSupport()
-  return await navigator.hid.getDevices()
+  const devices = await navigator.hid.getDevices()
+  logWebHid('get granted devices', {
+    count: devices.length,
+    devices: devices.map(device => ({
+      device: toDeviceKey(device),
+      vendorId: device.vendorId,
+      productId: device.productId,
+      collections: getCollections(device),
+    })),
+  })
+  return devices
 }
 
 async function tryRestoreDevice() {
   if (activeDevice && activeDevice.opened) {
+    logWebHid('reuse active device', {
+      device: toDeviceKey(activeDevice),
+    })
     return activeDevice
   }
 
@@ -95,6 +120,11 @@ async function tryRestoreDevice() {
 
   const devices = await getGrantedDevices()
   const restored = devices.find(device => matchesFilters(device, vendorIdState, usagePageState)) ?? null
+  logWebHid('try restore device', {
+    vendorIdState,
+    usagePageState,
+    restored: restored ? toDeviceKey(restored) : null,
+  })
 
   if (!restored) {
     activeDevice = null
@@ -115,6 +145,11 @@ async function pickDevice(vendorId: number, usagePage: number) {
 
   const grantedDevices = await getGrantedDevices()
   const grantedDevice = grantedDevices.find(device => matchesFilters(device, vendorId, usagePage)) ?? null
+  logWebHid('pick device from granted', {
+    vendorId,
+    usagePage,
+    grantedDevice: grantedDevice ? toDeviceKey(grantedDevice) : null,
+  })
 
   if (grantedDevice) {
     await ensureDeviceOpen(grantedDevice)
@@ -123,6 +158,7 @@ async function pickDevice(vendorId: number, usagePage: number) {
   }
 
   const filters: HIDDeviceFilter[] = [{ vendorId, usagePage }]
+  logWebHid('request device', { filters })
   const devices = await navigator.hid.requestDevice({ filters })
   const device = devices[0] ?? null
 
@@ -144,13 +180,29 @@ async function ensureActiveDevice() {
 }
 
 function enqueueDeviceOperation<T>(task: () => Promise<T>) {
-  const nextTask = operationQueue.then(task)
+  const nextTask = operationQueue.then(async () => {
+    logWebHid('queue task start')
+    try {
+      const result = await task()
+      logWebHid('queue task success')
+      return result
+    }
+    catch (error) {
+      console.error('[webhid] queue task error', error)
+      throw error
+    }
+  })
   operationQueue = nextTask.then(() => undefined, () => undefined)
   return nextTask
 }
 
 function waitForInputReport(device: HIDDevice, expectedReportId: number, timeoutMs = DEFAULT_TIMEOUT_MS) {
   let cleanup = () => { }
+  logWebHid('wait input report', {
+    device: toDeviceKey(device),
+    expectedReportId,
+    timeoutMs,
+  })
 
   const promise = new Promise<number[]>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -164,15 +216,31 @@ function waitForInputReport(device: HIDDevice, expectedReportId: number, timeout
 
     function handleReport(event: HIDInputReportEvent) {
       if (event.reportId !== expectedReportId) {
+        logWebHid('ignore input report', {
+          device: toDeviceKey(device),
+          expectedReportId,
+          actualReportId: event.reportId,
+          data: toArray(event.data),
+        })
         return
       }
 
       cleanup()
+      logWebHid('input report received', {
+        device: toDeviceKey(device),
+        reportId: event.reportId,
+        data: toArray(event.data),
+      })
       resolve([event.reportId, ...toArray(event.data)])
     }
 
     timer = setTimeout(() => {
       cleanup()
+      console.error('[webhid] input report timeout', {
+        device: toDeviceKey(device),
+        expectedReportId,
+        timeoutMs,
+      })
       reject(new Error('读取设备超时'))
     }, timeoutMs)
 
@@ -192,21 +260,47 @@ async function writeReport(buffer: number[], isRead = false) {
 
   const device = await ensureActiveDevice()
   const [reportId, ...payload] = buffer
+  logWebHid('write report start', {
+    device: toDeviceKey(device),
+    reportId,
+    isRead,
+    buffer,
+  })
   const readTask = isRead ? waitForInputReport(device, reportId) : null
 
   try {
     await device.sendReport(reportId, new Uint8Array(payload))
+    logWebHid('write report sent', {
+      device: toDeviceKey(device),
+      reportId,
+      payload,
+    })
   }
   catch (error) {
     readTask?.cancel()
+    console.error('[webhid] write report failed', {
+      device: toDeviceKey(device),
+      reportId,
+      payload,
+      error,
+    })
     throw error
   }
 
   if (!readTask) {
+    logWebHid('write report done without read', {
+      device: toDeviceKey(device),
+      reportId,
+    })
     return { message: 'write success' }
   }
 
   const data = await readTask.promise
+  logWebHid('write report done with read', {
+    device: toDeviceKey(device),
+    reportId,
+    data,
+  })
   return { data }
 }
 
@@ -223,6 +317,12 @@ export async function getWebHidStatus() {
   const device = await tryRestoreDevice()
   const devices = await getGrantedDevices()
   const current = device ? findCollection(device, usagePageState) : null
+  logWebHid('status', {
+    isConnected: !!device?.opened,
+    device: device ? toDeviceKey(device) : null,
+    vendorId: device?.vendorId ?? vendorIdState,
+    usagePage: current?.usagePage ?? usagePageState,
+  })
 
   return {
     isConnected: !!device?.opened,
@@ -235,7 +335,14 @@ export async function getWebHidStatus() {
 export async function connectWebHidDevice(params?: { vendor_id?: unknown, usage_page?: unknown }) {
   const vendorId = normalizeNumber(params?.vendor_id, vendorIdState)
   const usagePage = normalizeNumber(params?.usage_page, usagePageState)
+  logWebHid('connect device request', {
+    vendorId,
+    usagePage,
+  })
   const device = await pickDevice(vendorId, usagePage)
+  logWebHid('connect device success', {
+    device: toDeviceKey(device),
+  })
 
   return {
     message: 'ok',
@@ -247,6 +354,9 @@ export async function closeWebHidDevice() {
   allowAutoRestore = false
   return await enqueueDeviceOperation(async () => {
     if (activeDevice?.opened) {
+      logWebHid('close device', {
+        device: toDeviceKey(activeDevice),
+      })
       await activeDevice.close()
     }
 

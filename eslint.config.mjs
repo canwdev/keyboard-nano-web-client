@@ -7,4 +7,7 @@ export default antfu({
   ignores: [
     'src/auto-import.d.ts',
   ],
+  rules: {
+    'no-console': 'off',
+  },
 })
