@@ -1,35 +1,14 @@
-import axios, {AxiosResponse} from 'axios'
-import {isDev} from '@/enum'
-import {ref} from 'vue'
+import { ref } from 'vue'
+import { closeWebHidDevice, connectWebHidDevice, getWebHidStatus, pingWebHid, writeWebHid } from './webhid'
 
 export const isAxiosLoading = ref(false)
 
-// 设置 Axios 默认配置
-const api = axios.create({
-  baseURL: isDev ? '/dev_api' : '', // Node.js 服务器地址
-  timeout: 10000, // 请求超时设置
-})
-
-api.interceptors.request.use(
-  (config) => {
+async function runWithLoading<T>(task: () => Promise<T>) {
+  try {
     isAxiosLoading.value = true
-    return config
-  },
-  (error) => {
+    return await task()
+  } catch (error: any) {
     isAxiosLoading.value = false
-    return Promise.reject(error)
-  },
-)
-
-// 响应拦截器
-api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    isAxiosLoading.value = false
-    return response.data // 只返回响应数据
-  },
-  (error) => {
-    isAxiosLoading.value = false
-
     const message = error.response?.data?.message || error.message
 
     window.$notification({
@@ -38,25 +17,26 @@ api.interceptors.response.use(
       timeout: 5000,
     })
 
-    // 可以在这里处理错误
     return Promise.reject(error)
-  },
-)
+  } finally {
+    isAxiosLoading.value = false
+  }
+}
 
 export const keyboardNanoApi = {
   getStatus: async () => {
-    return await api.get('/status')
+    return await runWithLoading(() => getWebHidStatus())
   },
   deviceInit: async (params?: any) => {
-    return await api.post('/device_init', params)
+    return await runWithLoading(() => connectWebHidDevice(params))
   },
   deviceClose: async () => {
-    return await await api.post('/device_close')
+    return await runWithLoading(() => closeWebHidDevice())
   },
   write: async (params?: any) => {
-    return await api.post('/write', params)
+    return await runWithLoading(() => writeWebHid(params))
   },
   ping: async () => {
-    return await api.post('/ping')
+    return await runWithLoading(() => pingWebHid())
   },
 }

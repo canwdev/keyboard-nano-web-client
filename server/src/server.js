@@ -14,6 +14,20 @@ let h;
 let vendorIdS = 0x2b86;
 let usagePageS = 0xffb1;
 
+function closeCurrentDevice() {
+  if (!h) {
+    return;
+  }
+
+  try {
+    h.close();
+  } catch (error) {
+    console.error("关闭设备错误:", error);
+  } finally {
+    h = null;
+  }
+}
+
 function initUsb(vendorId, usagePage) {
   const devices = HID.devices();
   let devicePath = null;
@@ -29,6 +43,7 @@ function initUsb(vendorId, usagePage) {
     return null
   }
 
+  closeCurrentDevice();
   h = new HID.HID(devicePath);
   return {
     devicePath,
@@ -100,10 +115,7 @@ app.post('/device_init', (req, res) => {
 
 // 关闭设备
 app.post('/device_close', (req, res) => {
-  if (h) {
-    h.close();
-    h = null
-  }
+  closeCurrentDevice();
   return res.json({ message: "closed" });
 });
 
@@ -114,6 +126,10 @@ app.post('/write', async (req, res) => {
 
     if (!Array.isArray(buffer) || !buffer.length) {
       return res.status(400).json({ message: "buffer is not a valid array" });
+    }
+
+    if (!h) {
+      return res.status(400).json({ message: "Device is not connected" });
     }
 
     console.log('<<< write', buffer);
@@ -168,9 +184,18 @@ function ping(vendorId = vendorIdS, usagePage = usagePageS, pageId = 4) {
 
 // 写入数据
 app.post('/ping', (req, res) => {
-  const data = ping()
-  console.log(data)
-  return res.json({ message: data });
+  if (!h) {
+    return res.status(400).json({ message: "Device is not connected" });
+  }
+
+  try {
+    const data = ping()
+    console.log(data)
+    return res.json({ message: data });
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({ message: error.message });
+  }
 });
 // 启动服务器
 app.listen(port, () => {

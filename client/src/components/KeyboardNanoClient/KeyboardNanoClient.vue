@@ -1,11 +1,11 @@
 <script lang="ts" setup>
-import {computed, onMounted, ref} from 'vue'
-import {keyboardNanoApi} from '../../utils/api.ts'
-import {ActionType, HidDevice, PAGE_ID, UnitID} from './types.ts'
-import {useSettings} from './hooks/use-settings.ts'
+import { computed, onMounted, ref } from 'vue'
+import { keyboardNanoApi } from '../../utils/api.ts'
+import { ActionType, HidDevice, PAGE_ID, UnitID } from './types.ts'
+import { useSettings } from './hooks/use-settings.ts'
 import TabLayout from '../CommonUI/TabLayout.vue'
-import {useStorage} from '@vueuse/core'
-import {mainJson} from './data/index.ts'
+import { useStorage } from '@vueuse/core'
+import { mainJson } from './data/index.ts'
 
 const vendorId = ref('')
 const usagePage = ref('')
@@ -19,9 +19,9 @@ enum TabType {
 
 const activeTab = useStorage('keyboard_nano_client_active_tab', 0)
 const tabOptions = [
-  {label: '设置', value: TabType.SETTINGS},
-  {label: '按键', value: TabType.KEYBOARD},
-  {label: 'LED', value: TabType.LED},
+  { label: '设置', value: TabType.SETTINGS },
+  { label: '按键', value: TabType.KEYBOARD },
+  { label: 'LED', value: TabType.LED },
 ]
 
 const connectDevice = async () => {
@@ -70,7 +70,7 @@ const writeData = async (action: ActionType, extraData: any[] = [], isRead = fal
 }
 
 const sendPing = async () => {
-  const {message} = await keyboardNanoApi.ping()
+  const { message } = await keyboardNanoApi.ping()
   window.$notification({
     message: message,
     timeout: 5000,
@@ -105,9 +105,7 @@ const getStatus = async () => {
 
 onMounted(async () => {
   await getStatus()
-  if (!isConnected.value) {
-    await connectDevice()
-  } else {
+  if (isConnected.value) {
     await loadSettings()
   }
 })
@@ -136,8 +134,8 @@ const testColor = async () => {
   // data[12] = 0x00  // 3-G
 
   colorList.value.forEach((h6, index) => {
-    const {r, g, b} = getRGBHex(h6)
-    console.log(`set ${index + 1} key color ${h6} -> `, {r, g, b})
+    const { r, g, b } = getRGBHex(h6)
+    console.log(`set ${index + 1} key color ${h6} -> `, { r, g, b })
     // B
     data.push(b)
     // R
@@ -154,7 +152,7 @@ const lightKey = async (index: number) => {
 
   keyboardList.value.forEach((item, idx) => {
     if (idx === index) {
-      const {r, g, b} = getRGBHex('#FFFFFF')
+      const { r, g, b } = getRGBHex('#FFFFFF')
 
       // B
       data.push(b)
@@ -175,11 +173,11 @@ const lightKey = async (index: number) => {
   await writeData(ActionType.COMMAND, data)
 }
 
-const {settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, saveSettings} =
-  useSettings({writeData, writeDataRaw})
+const { settingsForm, keyboardModes, ledModes, ledEffectModes, loadSettings, saveSettings } =
+  useSettings({ writeData, writeDataRaw })
 
 const keyboardList = computed(() => {
-  return [{id: 0}, {id: 1}, {id: 2}].map((item) => {
+  return [{ id: 0 }, { id: 1 }, { id: 2 }].map((item) => {
     return {
       ...item,
       keyFunc: 0,
@@ -206,10 +204,7 @@ const keyboardList = computed(() => {
         </div>
 
         <div class="flex-rows">
-          <a
-            href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md"
-            target="_blank"
-          >
+          <a href="https://github.com/Jackadminx/Keyboard_nano_client/blob/main/Help/report.md" target="_blank">
             通信协议
           </a>
 
@@ -270,11 +265,7 @@ const keyboardList = computed(() => {
 
               <div class="flex-rows">
                 <select v-model="item.keyFunc">
-                  <option
-                    v-for="(func, index) in mainJson.key_func_list"
-                    :value="index"
-                    :key="index"
-                  >
+                  <option v-for="(func, index) in mainJson.key_func_list" :value="index" :key="index">
                     {{ func }}
                   </option>
                 </select>
@@ -314,12 +305,7 @@ const keyboardList = computed(() => {
               仅用于测试LED功能，设置不会保存，点击[重载配置]还原。
 
               <div class="flex-rows">
-                <input
-                  v-for="(item, index) in colorList"
-                  v-model="colorList[index]"
-                  :key="index"
-                  type="color"
-                />
+                <input v-for="(item, index) in colorList" v-model="colorList[index]" :key="index" type="color" />
               </div>
               <div class="flex-rows">
                 <button class="themed-button" @click="testColor">测试</button>
@@ -335,11 +321,8 @@ const keyboardList = computed(() => {
       <div class="device-list">
         <details v-for="(item, key) of deviceListGroupByProduct" :key="key">
           <summary>{{ key }}</summary>
-          <ul
-            :class="{active: v.vendorId === Number(vendorId) && v.usagePage === Number(usagePage)}"
-            v-for="v in item"
-            :key="v.path"
-          >
+          <ul :class="{ active: v.vendorId === Number(vendorId) && v.usagePage === Number(usagePage) }" v-for="v in item"
+            :key="v.path">
             <li>{{ v }}</li>
           </ul>
         </details>
