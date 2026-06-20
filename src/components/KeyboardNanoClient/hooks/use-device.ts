@@ -1,6 +1,7 @@
 import type { HidDevice } from '../types.ts'
 import { computed, ref } from 'vue'
 import { keyboardNanoApi } from '../../../utils/api.ts'
+import { logger } from '../../../utils/logger.ts'
 import { ActionType, PAGE_ID } from '../types.ts'
 
 interface DeviceLoaders {
@@ -71,7 +72,7 @@ export function useDevice() {
         throw error
       }
 
-      console.warn('[page] loader retry', {
+      logger.warn('[page] loader retry', {
         context,
         error,
       })
@@ -96,18 +97,20 @@ export function useDevice() {
     deviceList.value = res.devices
   }
 
-  async function writeDataRaw(buffer: number[] = [], isRead = false) {
-    console.log('[page] writeDataRaw', {
+  async function writeDataRaw(buffer: number[] = [], isRead = false, useLoading = true) {
+    logger.debug('[page] writeDataRaw', {
       isRead,
+      useLoading,
       buffer,
     })
     return await keyboardNanoApi.write({
       buffer,
       isRead,
+      useLoading,
     })
   }
 
-  async function writeData(action: ActionType, extraData: number[] = [], isRead = false) {
+  async function writeData(action: ActionType, extraData: number[] = [], isRead = false, useLoading = true) {
     let buffer: number[] = []
 
     buffer[0] = PAGE_ID
@@ -117,13 +120,14 @@ export function useDevice() {
       buffer = [...buffer, ...extraData]
     }
 
-    console.log('[page] writeData', {
+    logger.debug('[page] writeData', {
       action,
       extraData,
       isRead,
+      useLoading,
       buffer,
     })
-    return await writeDataRaw(buffer, isRead)
+    return await writeDataRaw(buffer, isRead, useLoading)
   }
 
   async function connectDevice() {
@@ -150,13 +154,13 @@ export function useDevice() {
   }
 
   async function reloadDevice() {
-    console.log('[page] reloadDevice start')
+    logger.debug('[page] reloadDevice start')
     await writeData(ActionType.RELOAD)
-    console.log('[page] reloadDevice wait before refresh', { waitMs: 600 })
+    logger.debug('[page] reloadDevice wait before refresh', { waitMs: 600 })
     await wait(600)
-    console.log('[page] reloadDevice refresh start')
+    logger.debug('[page] reloadDevice refresh start')
     await runLoadersWithRetry('reload')
-    console.log('[page] reloadDevice finished')
+    logger.debug('[page] reloadDevice finished')
   }
 
   async function resetDevice() {

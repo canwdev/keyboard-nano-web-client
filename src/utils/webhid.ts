@@ -1,4 +1,5 @@
 import type { HidDevice } from '@/components/KeyboardNanoClient/types'
+import { logger } from './logger.ts'
 
 const DEFAULT_VENDOR_ID = 0x2B86
 const DEFAULT_USAGE_PAGE = 0xFFB1
@@ -11,12 +12,7 @@ let allowAutoRestore = true
 let operationQueue = Promise.resolve()
 
 function logWebHid(message: string, payload?: unknown) {
-  if (payload === undefined) {
-    console.log(`[webhid] ${message}`)
-    return
-  }
-
-  console.log(`[webhid] ${message}`, payload)
+  logger.debug(`[webhid] ${message}`, payload)
 }
 
 function ensureWebHidSupport() {
@@ -188,7 +184,7 @@ function enqueueDeviceOperation<T>(task: () => Promise<T>) {
       return result
     }
     catch (error) {
-      console.error('[webhid] queue task error', error)
+      logger.error('[webhid] queue task error', error)
       throw error
     }
   })
@@ -236,7 +232,7 @@ function waitForInputReport(device: HIDDevice, expectedReportId: number, timeout
 
     timer = setTimeout(() => {
       cleanup()
-      console.error('[webhid] input report timeout', {
+      logger.error('[webhid] input report timeout', {
         device: toDeviceKey(device),
         expectedReportId,
         timeoutMs,
@@ -278,7 +274,7 @@ async function writeReport(buffer: number[], isRead = false) {
   }
   catch (error) {
     readTask?.cancel()
-    console.error('[webhid] write report failed', {
+    logger.error('[webhid] write report failed', {
       device: toDeviceKey(device),
       reportId,
       payload,

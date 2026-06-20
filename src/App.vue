@@ -1,17 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { addNotification } from './components/CommonUI/NotificationList/notification-list.ts'
 import KeyboardNanoClient from './components/KeyboardNanoClient/KeyboardNanoClient.vue'
 import { isAxiosLoading } from './utils/api.ts'
+import { setAppDebugLogging } from './utils/logger.ts'
+import { isPreviewLockActive, isPreviewStopping, previewLockMessage, stopPreviewFromOverlay } from './utils/preview-lock.ts'
 
 window.$notification = addNotification
+window.__setKeyboardNanoDebugLog = setAppDebugLogging
+const isGlobalOverlayVisible = computed(() => isAxiosLoading.value || isPreviewLockActive.value)
 </script>
 
 <template>
   <transition name="fade">
-    <div v-show="isAxiosLoading" class="loading-layer">
+    <div v-show="isGlobalOverlayVisible" class="loading-layer">
       <div class="loading-card">
-        <div class="loading-spinner" />
-        <div>设备通信中，请稍候...</div>
+        <div v-if="!isPreviewLockActive" class="loading-spinner" />
+        <div>{{ isPreviewLockActive ? previewLockMessage : '设备通信中，请稍候...' }}</div>
+        <button
+          v-if="isPreviewLockActive" class="loading-stop-button" :disabled="isPreviewStopping"
+          @click="stopPreviewFromOverlay"
+        >
+          {{ isPreviewStopping ? '停止中...' : '停止预览' }}
+        </button>
       </div>
     </div>
   </transition>
@@ -43,6 +54,22 @@ window.$notification = addNotification
   gap: 12px;
   align-items: center;
   font-size: 16px;
+}
+
+.loading-stop-button {
+  min-width: 120px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: #4d8d7a;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.loading-stop-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .loading-spinner {

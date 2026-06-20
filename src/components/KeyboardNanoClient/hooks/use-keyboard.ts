@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { logger } from '../../../utils/logger.ts'
 import { keyboardJson, mainJson } from '../data/index.ts'
 import { ActionType, PAGE_ID, UnitID } from '../types.ts'
 
@@ -450,9 +451,9 @@ export function useKeyboard(options: KeyboardHookOptions) {
   }
 
   async function loadKeyboardConfigs() {
-    console.log('[keyboard] load start')
+    logger.debug('[keyboard] load start')
     const { data } = await options.writeData(ActionType.READ, [UnitID.ALL, 0, 0], true)
-    console.log('[keyboard] load response', data)
+    logger.debug('[keyboard] load response', data)
     let startIndex = 7
 
     keyboardList.value = [0, 1, 2].map((id) => {
@@ -461,42 +462,42 @@ export function useKeyboard(options: KeyboardHookOptions) {
       startIndex += getBlockSize(keyType)
       return config
     })
-    console.log('[keyboard] load applied', keyboardList.value)
+    logger.debug('[keyboard] load applied', keyboardList.value)
   }
 
   async function saveKeyboardConfigs() {
     const resolution = options.getResolution()
     const unitIds = [UnitID.BTN1, UnitID.BTN2, UnitID.BTN3]
-    console.log('[keyboard] save start', {
+    logger.debug('[keyboard] save start', {
       resolution,
       keyboardList: keyboardList.value,
     })
 
     for (const [index, item] of keyboardList.value.entries()) {
       const buffer = buildKeyboardBuffer(item, unitIds[index], resolution.x, resolution.y)
-      console.log('[keyboard] save item', {
+      logger.debug('[keyboard] save item', {
         index,
         unitId: unitIds[index],
         item,
         buffer,
       })
       await options.writeDataRaw(buffer)
-      console.log('[keyboard] save item finished, wait before next', {
+      logger.debug('[keyboard] save item finished, wait before next', {
         index,
         waitMs: 600,
       })
       await wait(600)
     }
 
-    console.log('[keyboard] save all items finished, reload start')
+    logger.debug('[keyboard] save all items finished, reload start')
     await options.writeData(ActionType.RELOAD)
-    console.log('[keyboard] reload finished, wait before load', {
+    logger.debug('[keyboard] reload finished, wait before load', {
       waitMs: 300,
     })
     await wait(300)
-    console.log('[keyboard] reload wait finished, load start')
+    logger.debug('[keyboard] reload wait finished, load start')
     await loadKeyboardConfigs()
-    console.log('[keyboard] save finished')
+    logger.debug('[keyboard] save finished')
   }
 
   return {

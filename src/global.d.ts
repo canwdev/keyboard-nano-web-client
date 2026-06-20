@@ -52,6 +52,7 @@ declare global {
   }
 
   interface Window {
+    __setKeyboardNanoDebugLog: (enabled: boolean) => void
     $notification: (notification: Partial<INotification>) => void
   }
 }

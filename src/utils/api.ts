@@ -1,18 +1,23 @@
 import { ref } from 'vue'
+import { logger } from './logger.ts'
 import { closeWebHidDevice, connectWebHidDevice, getWebHidStatus, pingWebHid, writeWebHid } from './webhid'
 
 export const isAxiosLoading = ref(false)
 
-async function runWithLoading<T>(task: () => Promise<T>) {
+async function runWithLoading<T>(task: () => Promise<T>, useLoading = true) {
   try {
-    isAxiosLoading.value = true
-    console.log('[api] request start')
+    if (useLoading) {
+      isAxiosLoading.value = true
+    }
+    logger.debug('[api] request start')
     return await task()
   }
   catch (error: any) {
-    isAxiosLoading.value = false
+    if (useLoading) {
+      isAxiosLoading.value = false
+    }
     const message = error.response?.data?.message || error.message
-    console.error('[api] request error', {
+    logger.error('[api] request error', {
       message,
       error,
     })
@@ -26,30 +31,32 @@ async function runWithLoading<T>(task: () => Promise<T>) {
     return Promise.reject(error)
   }
   finally {
-    isAxiosLoading.value = false
-    console.log('[api] request finish')
+    if (useLoading) {
+      isAxiosLoading.value = false
+    }
+    logger.debug('[api] request finish')
   }
 }
 
 export const keyboardNanoApi = {
   getStatus: async () => {
-    console.log('[api] getStatus')
+    logger.debug('[api] getStatus')
     return await runWithLoading(() => getWebHidStatus())
   },
   deviceInit: async (params?: any) => {
-    console.log('[api] deviceInit', params)
+    logger.debug('[api] deviceInit', params)
     return await runWithLoading(() => connectWebHidDevice(params))
   },
   deviceClose: async () => {
-    console.log('[api] deviceClose')
+    logger.debug('[api] deviceClose')
     return await runWithLoading(() => closeWebHidDevice())
   },
   write: async (params?: any) => {
-    console.log('[api] write', params)
-    return await runWithLoading(() => writeWebHid(params))
+    logger.debug('[api] write', params)
+    return await runWithLoading(() => writeWebHid(params), params?.useLoading ?? true)
   },
   ping: async () => {
-    console.log('[api] ping')
+    logger.debug('[api] ping')
     return await runWithLoading(() => pingWebHid())
   },
 }

@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { logger } from '../../utils/logger.ts'
 import TabLayout from '../CommonUI/TabLayout.vue'
 import { useDevice } from './hooks/use-device.ts'
 import { useKeyboard } from './hooks/use-keyboard.ts'
@@ -71,11 +72,14 @@ const {
 })
 const {
   closeLedPreview,
+  effectPreviewOptions,
   ledGroups,
   loadLedGroups,
+  previewingEffectId,
   previewingGroupId,
   previewLedGroup,
   saveLedGroups,
+  startLedEffectPreview,
   updateLedGroupBrightness,
   updateLedGroupColor,
 } = useLed({
@@ -120,7 +124,7 @@ async function loadCurrentTabWithRetry() {
       throw error
     }
 
-    console.warn('[page] loadCurrentTab retry', { error })
+    logger.warn('[page] loadCurrentTab retry', { error })
     await wait(250)
     await getStatus()
     await task()
@@ -273,11 +277,13 @@ onBeforeUnmount(() => {
         />
 
         <LedPanel
-          v-if="currentTab === TabType.LED" :led-effect-mode="settingsForm.ledEffectMode"
-          :led-effect-modes="ledEffectModes" :led-groups="ledGroups" :led-mode="settingsForm.ledMode"
-          :led-modes="ledModes" :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
-          @update-group-brightness="updateLedGroupBrightness" @preview-group="previewLedGroup"
-          @update-group-color="updateLedGroupColor" @update:led-effect-mode="settingsForm.ledEffectMode = $event"
+          v-if="currentTab === TabType.LED" :effect-preview-options="effectPreviewOptions"
+          :led-effect-mode="settingsForm.ledEffectMode" :led-effect-modes="ledEffectModes" :led-groups="ledGroups"
+          :led-mode="settingsForm.ledMode" :led-modes="ledModes" :previewing-effect-id="previewingEffectId"
+          :previewing-group-id="previewingGroupId" @close-preview="closeLedPreview"
+          @preview-effect="startLedEffectPreview" @update-group-brightness="updateLedGroupBrightness"
+          @preview-group="previewLedGroup" @update-group-color="updateLedGroupColor"
+          @update:led-effect-mode="settingsForm.ledEffectMode = $event"
           @update:led-mode="settingsForm.ledMode = $event"
         />
       </TabLayout>
@@ -291,6 +297,7 @@ onBeforeUnmount(() => {
 .keyboard-nano-client {
   max-width: 600px;
   margin: 0 auto;
+  padding: 8px 0 16px;
 
   .mc-vertical-tab-layout {
     margin-top: 16px;
